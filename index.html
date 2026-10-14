@@ -151,6 +151,13 @@ body{
 #avMask .avsec{font-size:12.5px;color:var(--ink-soft);margin:12px 0 2px}
 #avMask details summary{font-size:12.5px;color:var(--ink-soft);margin:12px 0 2px;cursor:pointer}
 #avMask .avbody{max-height:56vh;overflow-y:auto}
+
+#avMask .avupload{display:flex;align-items:center;gap:12px;margin:4px 0 14px;padding:12px;border:1px solid var(--paper-edge);border-radius:8px;background:var(--paper-dark)}
+#avMask .avpreview .avatar{width:64px;height:64px;display:flex;align-items:center;justify-content:center;color:#F5F9F6;font-size:24px}
+#avMask .avupload-info{min-width:0;flex:1}
+#avMask .avupload-info small{display:block;margin-top:6px;font-size:12px;line-height:1.65;color:var(--ink-soft);overflow-wrap:anywhere}
+#avMask .avupload-info .mbtn{min-height:40px;max-width:100%;white-space:normal}
+#avMask .avupload-status{min-height:1.6em;font-size:12px;color:var(--ink-soft);margin-top:4px}
 #avMask .avnow{font-size:12.5px;color:var(--ink-soft);margin-top:8px;min-height:1.6em}
 .stickyrow{position:sticky;bottom:-28px;margin:12px -32px -28px;padding:12px 32px 16px;
   background:linear-gradient(to top,var(--paper-dark) 62%,rgba(235,241,236,0));border-radius:0 0 10px 10px}
@@ -1437,7 +1444,7 @@ const AV_DESC={"m1_01": "十五六岁山村少年，粗布短打，头发随手�
 const AV_AGE={'1':'14至17','2':'18至35','3':'36至55','4':'56至70'};
 function avDesc(slot){ return AV_DESC[slot]||''; }
 function avAgeHint(slot){ return (slot&&slot[0]!=='x')?AV_AGE[slot[1]]:''; }
-function npcPortrait(n){ const s=avSlotOf(n); return avDesc(s)||(n&&n.portrait)||''; }
+function npcPortrait(n){ if(customAvatarOf(n)) return ''; const s=avSlotOf(n); return avDesc(s)||(n&&n.portrait)||''; }
 /* ================= 姓名校正 =================
    模型偶尔会把主角的姓写串（叫「田伯光」却自称「我徐某人」）。
    提示词里已经单拎出来强调，这里再兜一道：把明显写错的自称改回来。 */
@@ -1537,6 +1544,7 @@ function avPickSlot(n){
    但每次都查一遍配不配：性别不对、年纪差出两档就重分一张。玩家亲手选的（avatarLocked）不动。 */
 function avSlotOf(n){
   if(!n||typeof n!=='object') return null;
+  if(customAvatarOf(n)) return null;
   let slot=n.avatar;
   if(!(slot&&AV_SLOTS.indexOf(slot)>=0&&(n.avatarLocked||avSlotFits(slot,n)))) slot=avPickSlot(n);
   try{
@@ -1656,6 +1664,7 @@ function decreeRecord(st,text,at,old){
   while((m=re.exec(text))){
     const f=decreeBody(m[2]); if(!f) continue;
     const raw=m[1];   // 前面可能连着「我送」「去找」，比对时看结尾是不是这个人的名字
+    if(/(?:乞丐|老者|老人|老头|老妪|少年|少女|女子|男子|修士|道人|和尚|掌柜|小二)$/.test(raw)) continue;   // 10-09 夜：「遇到一老乞丐」这种不是人名
     const last=st.decrees[st.decrees.length-1];
     if(last&&last.raw===raw&&JSON.stringify(last.f)===JSON.stringify(f)) continue;
     st.decrees.push({raw,f,at:num(at),old:!!old,done:[]});
@@ -1693,7 +1702,7 @@ const CULT_WORD=/师兄|师弟|师姐|师妹|同门|弟子|修士|道友|散修|
 function realmFromIdx(i){ i=Math.max(1,Math.min(30,Math.round(i))); return realmText(i<=9?{major:0,minor:i,perfect:false,ascended:false}:{major:Math.floor((i-10)/3)+1,minor:(i-10)%3+1,perfect:false,ascended:false}); }
 function realmEvidence(o,text,others){
   o=o||{}; const ctx=nameCtx(o.name,text,others)+' '+(o.identity||'')+' '+(o.notes||'');
-  const m=ctx.match(/(?:炼气|练气|筑基|金丹|结丹|元婴|化神|合体|渡劫|大乘)(?:[一二三四五六七八九0-9]+[阶层重]|初期|中期|后期|大圆满|圆满)?/);
+  const m=ctx.match(/(?:太乙金仙|大罗金仙|地仙|天仙|真仙|玄仙|金仙|炼气|练气|筑基|金丹|结丹|元婴|化神|合体|渡劫|大乘)(?:[一二三四五六七八九0-9]+[阶层重]|初期|中期|后期|大圆满|圆满)?/);
   if(m){ const t=fixRealmText(m[0]); if(parseRealm(t)) return t; }
   const id=`${o.identity||''} ${o.relation||''} ${ctx}`;
   if(MORTAL_WORD.test(id)&&!CULT_WORD.test(id)) return '凡人';
@@ -1709,13 +1718,13 @@ function ageEvidence(o,text,others){
 }
 function guessRealm(o,text,p,strict,others){
   o=o||{}; const ctx=nameCtx(o.name,text,others);
-  const m=ctx.match(/(?:炼气|练气|筑基|金丹|结丹|元婴|化神|合体|渡劫|大乘)(?:[一二三四五六七八九0-9]+[阶层重]|初期|中期|后期|大圆满|圆满)?/);
+  const m=ctx.match(/(?:太乙金仙|大罗金仙|地仙|天仙|真仙|玄仙|金仙|炼气|练气|筑基|金丹|结丹|元婴|化神|合体|渡劫|大乘)(?:[一二三四五六七八九0-9]+[阶层重]|初期|中期|后期|大圆满|圆满)?/);
   if(m){ const t=fixRealmText(m[0]); if(parseRealm(t)) return t; }
   const id=`${o.identity||''} ${o.relation||''} ${o.notes||''} ${ctx}`;
   const cult=CULT_WORD.test(id);
   if(MORTAL_WORD.test(id)&&!cult) return '凡人';
   const pr=p&&p.realm&&p.realm.major>=0?realmIndex(p.realm):2, pm=p&&p.realm?Math.max(0,p.realm.major):0;
-  if(/师父|师尊|长老|师叔|师伯|峰主|掌门|宗主|真人|上人/.test(id)){ const mj=Math.min(7,pm+1); return realmFromIdx(9+(mj-1)*3+2); }
+  if(/师父|师尊|长老|师叔|师伯|峰主|掌门|宗主|真人|上人/.test(id)){ const mj=Math.min(pm>=XIAN_PLANE_MAJOR?XIAN_TOP:7,pm+1); return realmFromIdx(9+(mj-1)*3+2); }
   if(/师兄|师姐/.test(id)) return realmFromIdx(pr+1);
   if(/师弟|师妹/.test(id)) return realmFromIdx(pr-1);
   if(cult||(o.faction&&p&&o.faction===p.faction&&!/凡人|散修/.test(o.faction))) return realmFromIdx(pr);
@@ -1766,7 +1775,8 @@ function avCellStyle(slot){
 // 没图就退回原来的首字圆牌，绝不开天窗
 function avatarFace(n,cls,size,me){
   const ring=avRing(n,me), dead=n&&n.alive===false;
-  const cell=avCellStyle(avSlotOf(n));
+  const custom=customAvatarOf(n);
+  const cell=custom?`background-image:url(${custom});background-size:cover;background-position:center`:avCellStyle(avSlotOf(n));
   const sz=size?`width:${size}px;height:${size}px;`:'';
   const st=cell?`${cell};box-shadow:inset 0 0 0 2px ${ring}`:`background-color:${ring}`;
   return `<div class="avatar ${cell?'av':''} ${dead?'dead':''} ${cls||''}" style="${sz}${st}">${esc(String((n&&n.name)||'？')[0]||'？')}</div>`;
@@ -1815,7 +1825,7 @@ function ageNote(){
   return '大限将至';
 }
 // 修真界不等人：相识的人各有各的人生
-function news(t){ S.engineNews=S.engineNews||[]; t=plain(t); if(t&&S.engineNews.length<8) S.engineNews.push(t); }
+function news(t){ S.engineNews=S.engineNews||[]; t=plain(t); if(!t) return; if(S._bg){ S.engineNews.push(t); while(S.engineNews.length>40) S.engineNews.shift(); (S.bgNew=S.bgNew||[]).push({pl:S.plane,t}); return; } if(S.engineNews.length<8) S.engineNews.push(t); }
 /* ================= 事实台账 =================
    卷录是模型写的摘要，压着压着细节就没了；台账是引擎自己记的，
    每一条都是真的落过账的事，永不进压缩、永不被摘要吃掉。 */
@@ -1873,11 +1883,12 @@ function tickNpcs(months){
 // 按年：NPC 长岁数、武功进退、生老病死
 function npcYearTick(){
   if(S.world) tianjiaoYear();
+  if(S.world&&typeof hiddenYear==='function'){ hiddenYear(); ensureRivals('year'); }
   for(const n of S.npcs){
     if(!n.alive) continue;
     n.age=num(n.age)+1;
     childYear(n);
-    const life=Math.round(realmLifespan(n.realm)*tagMul(n,'lifeMul'));
+    const life=Math.round(realmLifespan(n.realm)*tagMul(n,'lifeMul'))+num(n.lifeBonus);
     // 寿元耗尽：修士坐化，凡人病故；最后几年里每年有些概率提前走
     const left=life-n.age;
     if(left<=0||(left<=5&&Math.random()<0.12*Math.max(0.3,fdm().aging))){
@@ -1899,7 +1910,7 @@ function npcYearTick(){
     r.age++;
     if(r.age>=rlife||(rlife-r.age<=10&&Math.random()<0.08*Math.max(0.3,fdm().aging))){
       r.alive=false;
-      news(`修士榜上的${r.name}（${r.faction||'散修'}）已然辞世，其位空悬`);
+      news(`${rankName()}上的${r.name}（${r.faction||'散修'}）已然辞世，其位空悬`);
       const nn=findNpc(r.name); if(nn) nn.alive=false;
     }
   }
@@ -2083,6 +2094,7 @@ function advanceTime(n){
   if(starve) p.hp=Math.max(1,p.hp-Math.round(4*starve*fdm().starve));
   const healedNow=days?tickAilments(days/30):[];
   if(healedNow.length){S.healedLast=(S.healedLast||[]).concat(healedNow);for(const h of healedNow)ledger(`${h}已愈`);}
+  if(S.descent&&curPlane()==='下界'){ p.hp=Math.max(1,num(p.hp)-2); if(num(S.months)>=num(S.descent.until)||p.hp<30) S.descent.forced=true; }
   rebuildStatus();S.date=dateStr();tickWorldThreads();flushNpcLife();eggKinCheck();if(S.planes) bgPlanesFlush();migrateAscended();
   return {cost,starve,months:days/30,days};
 }
@@ -2184,7 +2196,7 @@ function fillRules(t){
   return stripStrict(t,!!f.freeAct).replace(/\{\{TONE_LABEL\}\}/g,prose().label).replace(/\{\{TONE\}\}/g,prose().rules).replace(/\{\{CHOSEN\}\}/g,f.chosen).replace(/\{\{LOVE\}\}/g,gate).replace(/\{\{SECRET\}\}/g,f.secretGate);
 }
 const TONE_NOTE='（上面【本局自由度】一段是本局的口径；它与前面通则说法不一时，以本局口径为准。）';
-function worldRules(){ return fillRules(WORLD_RULES)+'\n'+fdm().tone+'\n'+TONE_NOTE; }
+function worldRules(){ return fillRules(WORLD_RULES)+'\n'+fdm().tone+'\n'+TONE_NOTE+(inXianjie()?'\n'+xianRulesText():'')+(S&&S.descent&&curPlane()==='下界'?'\n'+descentRulesText():''); }
 // 对话用的抬头：只要世界观铁律那一段，外加本局口径
 function worldHead(){
   const f=fdm();
@@ -2388,8 +2400,8 @@ function realmText(r){
   if(r.perfect) return m+'大圆满';
   return r.major===0?`${m}${'一二三四五六七八九'[r.minor-1]}阶`:m+XIAN.minorLabel[r.minor-1];
 }
-function lingliNeed(r){ return r&&!r.ascended&&r.major>=0?XIAN.need[r.major]:0; }
-function atBottleneck(p){ return !!(p&&p.realm&&!p.realm.ascended&&p.realm.major>=0&&num0(p.lingli)>=lingliNeed(p.realm)); }
+function lingliNeed(r){ return r&&!r.ascended&&!r.dao&&r.major>=0?XIAN.need[r.major]:0; }
+function atBottleneck(p){ return !!(p&&p.realm&&!p.realm.ascended&&!p.realm.dao&&p.realm.major>=0&&num0(p.lingli)>=lingliNeed(p.realm)); }
 // 「境界序号」：炼气一阶=1 … 炼气九阶=9，筑基初期=10 … 大乘后期=30，飞升=31
 function realmIndex(r){ if(!r||r.major<0) return 0; if(r.ascended) return 31; return r.major===0?r.minor:9+(r.major-1)*3+r.minor; }
 
@@ -2460,6 +2472,7 @@ function realmLifespan(r){
   return XIAN.life[r.major];
 }
 function lifespanXian(p){
+  if(p&&p.realm&&p.realm.major===XIAN_TOP) return XIAN.life[XIAN_TOP];   // 大罗不朽，标签、奇遇都不再改它
   const base=realmLifespan(p.realm)+num0(p.lifeBonus);
   return Math.round(base*tagMul(p,'lifeMul'));
 }
@@ -2469,7 +2482,7 @@ function lifeRatioXian(p){ return num0(p.age)/Math.max(20,lifespanXian(p)); }
 // ctx: {mode:'闭关'|'日常'|'重伤', gongfa:功法倍率, aura:灵气浓度, partner:道侣同修倍率}
 function monthlyLingli(p,ctx){
   ctx=ctx||{};
-  if(!p||!p.realm||p.realm.ascended||p.realm.major<0) return 0;
+  if(!p||!p.realm||p.realm.ascended||p.realm.dao||p.realm.major<0) return 0;
   if(atBottleneck(p)) return 0;
   const mode=ctx.mode||'日常';
   const st=mode==='闭关'?1:(mode==='重伤'?0:0.4);
@@ -2528,13 +2541,13 @@ function prepCombine(sel){
   return {fail,death,keep,cd,proxy,force,used};
 }
 // 第几道关：跨大境界时为目标大境界序号 1–8（8 是飞升），小阶为 0
-function gateOf(r){ if(!r||r.ascended||r.major<0) return 0; return r.minor>=realmMinorMax(r.major)?r.major+1:0; }
+function gateOf(r){ if(!r||r.ascended||r.dao||r.major<0) return 0; return r.minor>=realmMinorMax(r.major)?r.major+1:0; }
 function breakOdds(p,opts){
   opts=opts||{};
   const r=p.realm, f=XIAN_FREEDOM[opts.mode||xianMode()]||XIAN_FREEDOM.mid;
   const crossMajor=r.minor>=realmMinorMax(r.major);
   // 跨大境界看的是下一境的门槛；大乘后期冲的是飞升，按大乘算
-  const tier=crossMajor?Math.min(7,r.major+1):r.major;
+  const tier=crossMajor?(r.major===7?7:Math.min(XIAN_TOP,r.major+1)):r.major;   // 飞升按大乘的表；大罗后期冲的是证道，按大罗算
   let fail=XIAN.fail[tier]*f.fail, death=XIAN.death[tier]*f.death;
   const A=p.attributes||p.wx||{};
   fail*= 1+(50-num0(A['悟性']))/200;   // 悟性 ×0.75–1.25
@@ -2563,7 +2576,8 @@ function breakthrough(p,opts){
   const fail=opts.forceFail?true:Math.random()<odds.fail;   // forceFail：渡劫时被人截杀打输，直接算失败
   if(!fail){
     p.lingli=0;
-    if(r.major===7&&odds.crossMajor){ r.ascended=true; r.perfect=false; return {ok:true,success:true,ascend:true,from,to:'飞升',odds}; }
+    if(r.major===7&&odds.crossMajor){ r.major=XIAN_PLANE_MAJOR; r.minor=1; r.perfect=false; return {ok:true,success:true,ascend:true,from,to:realmText(r),odds}; }   // 飞升：大乘后期 → 地仙初期
+    if(r.major===XIAN_TOP&&odds.crossMajor){ r.perfect=true; r.dao=true; return {ok:true,success:true,dao:true,from,to:realmText(r),odds}; }   // 证道
     if(odds.crossMajor){ r.major+=1; r.minor=1; } else r.minor+=1;
     r.perfect=false;
     let lgChange=null; const fx=eggFx(p);
@@ -2586,7 +2600,7 @@ function breakthrough(p,opts){
   else if(r.minor>1){ r.minor-=1; dropped=true; }
   return {ok:true,success:false,died:false,proxied,from,to:realmText(r),dropped,cd:p.breakCD,odds};
 }
-function canForce(p){ return !!(p&&p.realm&&!p.realm.ascended&&p.realm.major>=0&&!atBottleneck(p)&&num0(p.lingli)>=lingliNeed(p.realm)*0.8); }
+function canForce(p){ return !!(p&&p.realm&&!p.realm.ascended&&!p.realm.dao&&p.realm.major>=0&&!atBottleneck(p)&&num0(p.lingli)>=lingliNeed(p.realm)*0.8); }
 
 /* ---- 开局底子（引擎掷） ---- */
 function rollAttr(lo,hi){ return lo+Math.floor(Math.random()*(hi-lo+1)); }
@@ -2704,8 +2718,10 @@ function cnToNum(t){
 function parseRealm(t){
   t=plain(t);
   if(!t||/凡人|不曾修炼|未入道|没有修为/.test(t)) return {major:-1,minor:0,perfect:false,ascended:false};
-  if(/飞升|仙人/.test(t)) return {major:7,minor:3,perfect:false,ascended:true};
-  const mj=XIAN.majors.findIndex(m=>t.indexOf(m)>=0);
+  if(/证道|道祖/.test(t)) return {major:XIAN_TOP,minor:3,perfect:true,ascended:false,dao:true};
+  const hit=XIAN_MAJORS_LONG.find(x=>t.indexOf(x[0])>=0);      // 长名先认：「太乙金仙」不能认成「金仙」
+  if(!hit&&/飞升|仙人/.test(t)) return {major:XIAN_PLANE_MAJOR,minor:1,perfect:false,ascended:false};
+  const mj=hit?hit[1]:-1;
   if(mj<0) return null;
   const r={major:mj,minor:1,perfect:false,ascended:false};
   if(/大圆满|圆满/.test(t)){ r.minor=realmMinorMax(mj); r.perfect=true; return r; }
@@ -2777,9 +2793,11 @@ function doBreakthrough(opts){
   st.temper=0; st.travel=0;
   p.bottleneckNoted=false;
   syncPower(p);
+  if(res.success&&typeof ensureRivals==='function') ensureRivals('break');
+  if(res.success&&res.ascend&&curPlane()==='下界') S.pendingAscend=true;
   if(res.success){
-    ledger(res.ascend?`自${res.from}冲关成功，飞升`:`冲关成功：${res.from}→${res.to}`);
-    news(res.ascend?`${p.name}渡过最后一关，飞升而去`:`${p.name}冲关成功，修为由${res.from}进至${res.to}`);
+    ledger(res.dao?`自${res.from}再进一步，证道`:res.ascend?`自${res.from}冲关成功，飞升，成了${res.to}`:`冲关成功：${res.from}→${res.to}`);
+    news(res.dao?`${p.name}证道了`:res.ascend?`${p.name}渡过最后一关，飞升而去`:`${p.name}冲关成功，修为由${res.from}进至${res.to}`);
   }else if(res.died){
     ledger(`冲击${res.from}之上的关口失败，身死道消`);
     S.engineDeath=`${p.name}冲关失败，身死道消`;
@@ -2808,7 +2826,7 @@ function xsched(){
   }
   return S.xs;
 }
-function tierOf(key){ return REALM_TIERS.find(t=>t.key===key); }
+function tierOf(key){ return REALM_TIERS.find(t=>t.key===key)||XREALM_TIERS.find(t=>t.key===key); }
 function realmEligible(p,tier){ return !!(p&&p.realm&&tier.majors.includes(p.realm.major)); }
 // 身世和世界是同时生成的，身世里提到的宗门世界里未必有。补进势力表，收徒时优先来这家
 const SECT_NAME_RE=/(?:拜入|去|前往|投奔|加入|考入|投入|进|入|上)([\u4e00-\u9fa5]{2,4}?(?:宗|门|派|谷|阁|宫|山庄|书院|剑派))/g;
@@ -2840,13 +2858,14 @@ function scheduleMonth(){
     if(S.sect){ r.done=true; if(r.tid){ const e=eventById(r.tid); if(e) closeWorldThread(e,'主角已有宗门','主角拜入宗门'); } }
     else if(!r.open&&m>=r.at){
       r.sect=r.sect||recruitSect(); r.open=true; r.until=m+2;
-      const e=addWorldThread({title:`${r.sect}开山收徒`,text:`${r.sect}开山收徒，两个月内凡有灵根者都可以上山应试`,cause:'宗门按例收徒',actors:[r.sect],stage:'发生',source:'engine'});
+      const xr=inXianjie(), rt=xr?`${r.sect}招揽飞升者`:`${r.sect}开山收徒`, rx=xr?`${r.sect}在${arrivalPlace()}张榜，招揽新近飞升的仙人，两个月内可去接引殿应选`:`${r.sect}开山收徒，两个月内凡有灵根者都可以上山应试`;
+      const e=addWorldThread({title:rt,text:rx,cause:xr?'仙宗按例招揽飞升者':'宗门按例收徒',actors:[r.sect],stage:'发生',source:'engine'});
       r.tid=e&&e.id;
-      news(`${r.sect}开山收徒，两个月内凡有灵根者都可以上山应试`);
+      news(rx);
     }else if(r.open&&m>=r.until){
       r.open=false; r.done=true;
-      const e=r.tid&&eventById(r.tid); if(e) closeWorldThread(e,'收徒已经结束','期限已过');
-      news(`${r.sect}的收徒已经结束`);
+      const e=r.tid&&eventById(r.tid); if(e) closeWorldThread(e,inXianjie()?'招揽已经结束':'收徒已经结束','期限已过');
+      news(inXianjie()?`${r.sect}招揽飞升者的榜已经撤了`:`${r.sect}的收徒已经结束`);
     }
   }
   // 秘境：开前一年放风声，开一到三个月
@@ -2854,12 +2873,12 @@ function scheduleMonth(){
     const t=tierOf(st.key);
     if(x.open&&x.open.key===st.key) continue;
     if(!st.warned&&m>=st.next-12){
-      st.warned=true; st.name=pick(REALM_NAMES.filter(n=>!Object.values(x.used).includes(n)))||pick(REALM_NAMES);
+      st.warned=true; st.name=pick(realmNamePool().filter(n=>!Object.values(x.used).includes(n)))||pick(realmNamePool());
       news(`传闻${st.name}一年后将要开启，是一处${t.name}，${t.text}修士可入`);
       rememberKnowledge(`${st.name}（${t.name}）约一年后开启，${t.text}可入`,'修真界传闻','未证实');
     }
     if(m>=st.next&&!x.open){
-      x.open={key:st.key,name:st.name||pick(REALM_NAMES),closes:m+rnd(1,3)};
+      x.open={key:st.key,name:st.name||pick(realmNamePool()),closes:m+rnd(1,3)};
       x.used[st.key+m]=x.open.name;
       const e=addWorldThread({title:`${x.open.name}开启`,text:`${t.name}${x.open.name}开启，${t.text}修士可入，一到三个月后关闭`,cause:'秘境按期开启',actors:[],stage:'发生',source:'engine'});
       x.open.tid=e&&e.id;
@@ -3015,6 +3034,11 @@ function respectBonus(n,type,attr){            // 说服、威胁低阶之人的
 }
 function playerAddressRule(){
   const p=S.player, sn=surnameOf(p.name), pm=majorOf(p), rt=realmText(p.realm);
+  if(pm>=XIAN_PLANE_MAJOR&&!inXianjie()) return `主角是从仙界打穿界壁下凡的${rt}，下界任何修士在他面前都是蝼蚁：见他称「上仙」，他下界宗门的后人称「${sn}老祖」「祖师」，至亲照旧称呼。主角自称「我」「本座」看性子。`;
+  if(pm>=XIAN_PLANE_MAJOR&&inXianjie()){
+    const hon=pm>=14?'「帝君」':pm>=13?'「道君」':pm>=12?'「仙尊」':pm>=10?'「仙君」':'「上仙」「前辈」', self=pm>=14?'「本帝」「吾」':pm>=13?'「本座」':pm>=12?'「本尊」':pm>=10?'「本君」':'「本仙」「在下」';
+    return `主角是${rt}，${p.ascender?'下界飞升上来的，':''}仙界以境界论尊卑：境界比他低一个大境界以上的仙人称他${hon}，见面执晚辈礼；同境界称「${sn}道友」；境界比他高的，他得执晚辈礼、称前辈或按对方境界称呼。主角自称「我」「在下」${pm>=10?'，熟了以后也可自称'+self:''}。下界来的凡人修士见了他称「上仙」。`;
+  }
   if(pm<=0) return `主角眼下只是炼气小修：自称「我」「在下」，见了筑基以上的修士自称「晚辈」；同辈叫他「${sn}道友」「${sn}师${p.gender==='女'?'妹':'弟'}」「小${sn}」之类。`;
   const hon=pm>=3?`「${sn}老祖」「${sn}前辈」`:(pm>=2?`「${sn}前辈」「${sn}真人」`:`「${sn}前辈」`);
   return `主角已是${rt}修士，修真界以境界论尊卑：境界比他低一个大境界以上的人，称他${hon}，同门晚辈称他「${sn}师叔」${pm>=2?`或「${sn}师叔祖」`:''}，见面先行礼、自称「晚辈」；凡人称他「仙师」${pm>=2?'「上仙」':''}。主角自己说话自称「我」「在下」${pm>=2?'「本座」（看他性子）':''}，不再自称晚辈——只有面对境界比他高的人才执晚辈礼。同境界的人叫他「${sn}道友」。主角境界涨了，旧识的称呼和态度要跟着改过来，别还叫他「小${sn}」。`;
@@ -3140,8 +3164,10 @@ function usePill(idx){
    品阶 0.8–1.6；五行与灵根相合 ×1.2、相克 ×0.8。取所有功法里最好的一门当主修 */
 const KE={'金':'木','木':'土','土':'水','水':'火','火':'金'};   // 金克木……
 function artMult(a,p){
-  const g=gradeIndex(a&&a.grade)||1;
-  let m=0.8+(g-1)*0.8/11;
+  const gi=gradeIndex(a&&a.grade)||1;
+  let m;
+  if(majorOf(p)>=XIAN_PLANE_MAJOR) m=gi<=12?(0.8+(gi-1)*0.8/11)*0.5:1+gradePow(gi,p)*0.6/12;   // 10-12：下界功法修不出多少仙元，转修仙界功法才是正路
+  else{ const g=effGrade(gi,p); m=0.8+(g-1)*0.8/11; }
   const el=a&&a.element, lg=(p&&p.linggen&&p.linggen.el)||[];
   if(el&&lg.includes(el)) m*=1.2;
   else if(el&&lg.some(x=>KE[x]===el||KE[el]===x)) m*=0.8;
@@ -3219,7 +3245,7 @@ function npcCultivateMonth(n,q){
   n.wx=n.wx||{'悟性':rnd(30,80),'心性':rnd(30,80)};
   if(n.lingli==null) n.lingli=rnd(0,Math.floor(lingliNeed(n.realm)*0.8));
   if(num(n.breakCD)>0){ n.breakCD--; return; }
-  if(!atBottleneck(n)){ addLingli(n,monthlyLingli(n,{mode:'闭关'})*0.7); return; }
+  if(!atBottleneck(n)){ addLingli(n,monthlyLingli(n,{mode:'闭关'})*0.7*(num(n.unstableUntil)>num(S.months)?0.7:1)); return; }
   // NPC 灵力一满，熬上几个月就冲
   if(Math.random()>0.25) return;
   const from=realmText(n.realm);
@@ -3304,6 +3330,7 @@ const GIFT_TABLE=[
   [/器|铁匠|炼器/,'法器',['护身玉佩','青钢飞针']],[/阵|符/,'符箓',['火球符','轻身符','金刚符']],[/世家|商|富/,'灵石',[]],[/凡人|农|猎|镇/,'其他',['一包干粮','一双新鞋','一罐腌菜']]
 ];
 function npcGiftMonth(q){
+  if(S._bg) return;   // 另一界的人捎不来东西（X5 另做往下界送物）
   const p=S.player;
   for(const n of S.npcs){
     if(!npcKnown(n)||num(n.age)<14) continue;
@@ -3315,10 +3342,12 @@ function npcGiftMonth(q){
     const txt=(n.identity||'')+(n.signature||'')+(n.faction||'');
     const row=GIFT_TABLE.find(g=>g[0].test(txt))||GIFT_TABLE[GIFT_TABLE.length-1];
     let what;
-    if(row[1]==='灵石'){ const m=rnd(10,40)*Math.max(1,n.realm&&n.realm.major>0?n.realm.major*2:1); p.money+=m; what=`${m}块灵石`; }
+    if(row[1]==='灵石'&&inXianjie()){ const m=rnd(1,2); p.money+=m; what=`${m}块仙晶`; }
+    else if(row[1]==='灵石'){ const m=rnd(10,40)*Math.max(1,n.realm&&n.realm.major>0?n.realm.major*2:1); p.money+=m; what=`${m}块灵石`; }
     else{
       const it={name:pick(row[2]),desc:`${n.name}托人捎来的`};
-      if(row[1]==='法器'){ it.grade=gradeText(Math.max(1,Math.min(6,1+Math.max(0,(n.realm&&n.realm.major)||0)*2))); normWeapon(it); }
+      if(row[1]==='法器'&&isXianRealm(n.realm)){ it.grade=gradeText(Math.max(13,gradeCapFor({realm:n.realm})-2)); normWeapon(it); }
+      else if(row[1]==='法器'){ it.grade=gradeText(Math.max(1,Math.min(6,1+Math.max(0,(n.realm&&n.realm.major)||0)*2))); normWeapon(it); }
       p.items[row[1]]=p.items[row[1]]||[]; p.items[row[1]].push(it); what=it.name;
     }
     lifeLog(n,`托人给${p.name}捎去${what}`);
@@ -3413,6 +3442,7 @@ function togetherMul(r,a,b){
 }
 function pregChance(r){
   const a=personByName(r.a), b=personByName(r.b);
+  if(S._bg&&(a===S.player||b===S.player)) return 0;   // 主角人不在这一界
   if(!a||!b||a.alive===false||b.alive===false) return 0;
   if(a.gender===b.gender) return 0;
   const f=a.gender==='女'?a:b, m=f===a?b:a;
@@ -3465,7 +3495,7 @@ function childBirth(f){
 function familyMonth(q){
   const day=num(S.elapsedDays);
   // 生产
-  for(const o of [S.player].concat(S.npcs)){
+  for(const o of (S._bg?[]:[S.player]).concat(S.npcs)){
     if(!o||o.alive===false||!o.preg) continue;
     if(day>=num(o.preg.due)){
       const kids=childBirth(o), me=playerName();
@@ -3538,6 +3568,7 @@ function makeTianjiaoOne(){
 }
 function ensureTianjiao(){
   if(!S||!S.world) return [];
+  if(inXianjie()){ S.world.tianjiao=S.world.tianjiao||[]; while(S.world.tianjiao.filter(x=>x.alive!==false).length<8) S.world.tianjiao.push(makeAscenderOne()); return S.world.tianjiao; }
   S.world.tianjiao=S.world.tianjiao||[];
   while(S.world.tianjiao.filter(x=>x.alive!==false).length<8) S.world.tianjiao.push(makeTianjiaoOne());
   return S.world.tianjiao;
@@ -3566,7 +3597,9 @@ function ensureFactionMeta(f){
   f.log=f.log||[];
 }
 function facSetLeader(f,name,realm,gender){
-  f.leader=name; const npc=findNpc(name);
+  f.leader=name;
+  if(syncPlayerFactionLeader(f)){ f.lSince=curYear(); return; }
+  const npc=findNpc(name);
   const rk=((S&&S.world&&S.world.ranking)||[]).find(x=>x.name===name);
   f.lGender=npc&&/[男女]/.test(npc.gender||'')?npc.gender:(gender||(rk&&rk.gender)||inferGender({name},0.25));
   f.lRealm=npc&&npc.realm?JSON.parse(JSON.stringify(npc.realm)):realm||facLeaderRealm(Math.max(0,num(f.power)-15));
@@ -3574,9 +3607,10 @@ function facSetLeader(f,name,realm,gender){
   f.lSince=curYear();
 }
 function facSucceed(f,why){
-  const old=f.leader, nm=makeRankName(Math.random()<0.25?'女':'男');
+  if(syncPlayerFactionLeader(f)) return;
+  const old=f.leader, lg=Math.random()<0.25?'女':'男', nm=makeRankName(lg);
   const r=f.lRealm?{major:Math.max(2,f.lRealm.major-(Math.random()<0.6?1:0)),minor:rnd(1,3),perfect:false,ascended:false}:null;
-  facSetLeader(f,nm,r);
+  facSetLeader(f,nm,r,lg);
   f.power=clamp(num(f.power)-rnd(1,3));
   facLog(f,`${why}，${nm}接任宗主`,-2);
   news(`${f.name}${why}，由${nm}接任宗主`);
@@ -3655,7 +3689,8 @@ function factionYear(){
     ensureFactionMeta(f);
     // 宗主：认识的人按人物表；榜上的人按榜；其余引擎记年纪
     const npc=findNpc(f.leader), rk=(w.ranking||[]).find(x=>x.name===f.leader);
-    if(npc){ f.lRealm=npc.realm?JSON.parse(JSON.stringify(npc.realm)):f.lRealm; f.lAge=num(npc.age); if(npc.alive===false) facSucceed(f,`宗主${f.leader}亡故`); }
+    if(syncPlayerFactionLeader(f)){ /* 主角的年龄、修为和生死由主角引擎结算。 */ }
+    else if(npc){ f.lRealm=npc.realm?JSON.parse(JSON.stringify(npc.realm)):f.lRealm; f.lAge=num(npc.age); if(npc.alive===false) facSucceed(f,`宗主${f.leader}亡故`); }
     else if(rk&&rk.alive===false) facSucceed(f,`宗主${f.leader}辞世`);
     else{
       f.lAge=num(f.lAge)+1;
@@ -3673,6 +3708,7 @@ function factionYear(){
     const atWar=S.clan&&S.clan.war&&S.clan.war.foe===f.name;
     if(f.low>=3&&!atWar&&!(S.player&&S.player.faction===f.name)){
       w.factions=w.factions.filter(x=>x!==f); w.goneFactions=w.goneFactions||[]; w.goneFactions.push(f.name);
+      for(const n of (S.npcs||[])) if(n&&n.faction===f.name){ n.faction='散修'; if(!String(n.identity||'').startsWith('原'+f.name)) n.identity=`原${f.name}${n.identity?'，'+String(n.identity).replace(f.name,''):''}`; if(typeof appendNote==='function') appendNote(n,`${f.name}已散`); }
       news(`${f.name}撑不下去了，山门一散，弟子各投别家`);
       rememberKnowledge(`${f.name}已经散了`,'风闻','已证实');
     }
@@ -3697,9 +3733,10 @@ function tianjiaoYear(){
     if(t.alive===false) continue;
     const npc=findNpc(t.name);
     if(npc){ t.realm=npc.realm; t.age=npc.age; t.alive=npc.alive; }
-    else{ t.age++; if(Math.random()<0.45){ const r=t.realm; if(r.minor<realmMinorMax(r.major)) r.minor++; else { r.major++; r.minor=1; } } }
+    else{ t.age++; if(Math.random()<(inXianjie()?0.01:0.45)){ const r=t.realm; if(r.minor<realmMinorMax(r.major)) r.minor++; else { r.major++; r.minor=1; } } }
     t['武功']=powerFromRealm(t.realm);
-    if(t.realm.major>=2){ t.gone=true; news(`天骄榜上的${t.name}结成金丹，出了天骄榜`); }
+    if(inXianjie()){ if(t.realm.major>XIAN_PLANE_MAJOR){ t.gone=true; news(`飞升者榜上的${t.name}成了天仙，出了飞升者榜`); } }
+    else if(t.realm.major>=2){ t.gone=true; news(`天骄榜上的${t.name}结成金丹，出了天骄榜`); }
   }
   S.world.tianjiao=list.filter(t=>!t.gone&&t.alive!==false);
   ensureTianjiao();
@@ -3721,7 +3758,7 @@ function xModal(title,sub,body,buttons){
 }
 
 /* ================= 冲关与闭关（面板按钮） ================= */
-function nextRealmText(p){ const r=Object.assign({},p.realm); if(r.minor<realmMinorMax(r.major)) r.minor++; else { if(r.major>=7) return '飞升'; r.major++; r.minor=1; } r.perfect=false; return realmText(r); }
+function nextRealmText(p){ const r=Object.assign({},p.realm); if(r.minor<realmMinorMax(r.major)) r.minor++; else { if(r.major===7) return '飞升'; if(r.major>=XIAN_TOP) return '证道'; r.major++; r.minor=1; } r.perfect=false; return realmText(r); }
 function pctText(x){ x=num(x)*100; return x<=0?'0%':x<1?(x<0.1?'不到 0.1%':x.toFixed(1)+'%'):Math.round(x)+'%'; }
 /* ================= 功法法宝彩蛋（致敬物） =================
    出处是那二十本书，名字一律化用。秘境机缘 3% 换成一件、坊市奇摊每年 4%、同书的人名彩蛋主角遇到概率翻倍；一局里每件最多一次。 */
@@ -3763,8 +3800,8 @@ function relicTierOk(r,major,market){
 }
 function relicPick(major,market){
   const p=S.player, seen=relicSeen(), book=EGG_BOOK[p.egg||''];
-  const pending=((S.inRealm&&S.inRealm.loot)||[]).map(l=>l.item&&l.item.relic).filter(Boolean);
-  if(seen.length+pending.length+(S.relicStall?1:0)>=RELIC_CAP) return null;   // 一局至多遇到三件：修士一活上千年，不封顶就全遇上了
+  const pending=((S.inRealm&&S.inRealm.loot)||[]).map(l=>l.item&&l.item.relic).filter(Boolean).concat(S.relicStall?[S.relicStall.id]:[]).concat(S.inRealm&&S.inRealm.spot&&!S.inRealm.spot.done?[S.inRealm.spot.id]:[]);
+  // 10-09：不再限一局几件，难度加在「拿」上
   const pool=RELICS.filter(r=>relicTierOk(r,major,market)&&!seen.includes(r.id)&&!pending.includes(r.id));
   if(!pool.length) return null;
   const w=pool.map(r=>r.src===book?2:1), tot=w.reduce((a,b)=>a+b,0); let x=Math.random()*tot;
@@ -3845,7 +3882,7 @@ function relicYear(){
   }
 }
 function stallBuy(){
-  const st=S.relicStall; if(!st) return {ok:false,why:'摊子已经走了'};
+  const st=S.relicStall; if(!st||st.seen===false) return {ok:false,why:'摊子已经走了'};
   if(S.player.money<st.price) return {ok:false,why:'灵石不够'};
   S.player.money-=st.price; const it=relicItem(RELIC[st.id]); (S.player.items[RELIC[st.id].cat]=S.player.items[RELIC[st.id].cat]||[]).push(it); relicGain(it);
   ledger(`在坊市奇摊花 ${st.price} 块灵石买下【${it.name}】`); S.relicStall=null; return {ok:true};
@@ -3956,16 +3993,17 @@ function dustMissing(){
 function prepOptions(p){
   p=p||S.player; const g=gateOf(p.realm), st=prepState(p), out=[];
   const add=(key,ok,why,note,dflt)=>out.push({key,label:PREP_FX[key].label,ok:!!ok,why:ok?'':why,note:note||'',dflt:ok&&dflt!==false});
+  if(g>=9&&g<=14){ const pi=breakPillFor(p); add('pill',pi>=0,`手里没有${XPILL_FOR[g]}`,pi>=0?`服下【${p.items['丹药'][pi].name}】，失败率 ×0.7`:''); }
   if(g<=4){ const pi=breakPillFor(p); add('pill',pi>=0,g?`手里没有${['','筑基丹','凝金丹','结婴丹','化神丹'][g]}`:'手里没有破境丹',pi>=0?`服下【${p.items['丹药'][pi].name}】，失败率 ×0.7`:''); }
   const ty=Math.floor(num(st.temper)/12);
   add('temper',ty>=1,`在瓶颈上闭关就算压境，满一年起算（已压 ${Math.floor(num(st.temper))} 个月）`,ty>=1?`已压境 ${Math.min(3,ty)} 年：失败率 ×${Math.pow(0.85,Math.min(3,ty)).toFixed(2)}；失败时灵力留一半、冷却减半`:'');
   if(g===4){ const vy=Math.floor(num(st.travel)/12); add('travel',vy>=1,`到瓶颈后在外游历、不闭关，满一年起算（已游历 ${Math.floor(num(st.travel))} 个月）`,vy>=1?`游历 ${Math.min(2,vy)} 年：失败率 ×${Math.pow(0.85,Math.min(2,vy)).toFixed(2)}（与压境二选一）`:'',vy>ty); }
-  if(g>=3&&g<=6){ const n=st.guard&&st.guard.gate===g?findNpc(st.guard.name):null;
+  if((g>=3&&g<=6)||g>=9){ const n=st.guard&&st.guard.gate===g?findNpc(st.guard.name):null;
     add('guard',n&&guardOk(p,n,g),`在人物面板里请一位${GATE_NAME[g]}以上的熟人护法（好感≥70，亲属、师徒、道侣≥50），欠大人情`,n?`${n.name}护法：失败后丧命 ×0.3，冷却减半`:''); }
-  if([3,4,6].includes(g)) add('sectGuard',st.sectGuard===g,'宗门兑换里换宗门护法',`宗门护法：失败后丧命 ×0.5`,!(st.guard&&st.guard.gate===g));
+  if([3,4,6,12].includes(g)) add('sectGuard',st.sectGuard===g,'宗门兑换里换宗门护法',`宗门护法：失败后丧命 ×0.5`,!(st.guard&&st.guard.gate===g));
   if(g===5) add('avatar',!!st.avatar,'先炼一具身外化身：三件灵材＋一件地阶以上法器，炼器判定（困难）','化身替你挡一次死，代价是元气大伤（体魄 −10）');
   if(g===6) add('array',!!st.array,'坊市买地阶阵盘（3000 灵石），或自己布阵：三件灵材，阵法判定（困难）','渡劫阵：失败率 ×0.8');
-  if(g>=6){ const oi=offeringIndex(p,g); add('offering',oi>=0,`要献祭一件${g>=7?'天':'地'}阶以上法器`,oi>=0?`献掉【${p.items['法器'][oi].name}】：失败后丧命 ×0.5`:''); }
+  if(g>=6){ const oi=offeringIndex(p,g); add('offering',oi>=0,`要献祭一件${g>=9?gradeText(13+(g-9)*3).replace(/下品$/,''):(g>=7?'天阶':'地阶')}以上的法宝`,oi>=0?`献掉【${p.items['法器'][oi].name}】：失败后丧命 ×0.5`:''); }
   if(g===7){ add('siteSect',rankAtLeast('长老'),'在宗门渡劫要长老以上','宗门出护山大阵：失败后丧命 ×0.5；事后十年坐镇宗门，闭关上限减半');
              add('siteThunder',true,'','去雷泽渡劫：失败率 ×0.75；三成会被人截杀，打输算冲关失败（与在宗门渡劫二选一）',false); }
   if(g===8){ const miss=dustMissing(); add('dust',!miss.length,miss.join('；'),'了却尘缘：失败后丧命 ×0.5'); }
@@ -4169,7 +4207,7 @@ async function doBreakTurn(sel){
   const p=S.player, target=nextRealmText(p);
   const res=doBreakthrough(sel?{prep:selToPrep(sel)}:undefined);
   if(!res.ok){ toast(res.reason||'冲不了'); return; }
-  const judge={fate:d20(),check:null,worldEvent:null,duel:false,months:1,cult:'闭关',breakRes:{from:res.from,to:res.to||'',success:!!res.success,died:!!res.died,ascend:!!res.ascend,dropped:!!res.dropped,cd:res.cd||0,pill:res.pill||'',
+  const judge={fate:d20(),check:null,worldEvent:null,duel:false,months:1,cult:'闭关',breakRes:{from:res.from,to:res.to||'',success:!!res.success,died:!!res.died,ascend:!!res.ascend,dao:!!res.dao,dropped:!!res.dropped,cd:res.cd||0,pill:res.pill||'',
     used:(res.odds&&res.odds.used||[]).filter(x=>x!=='破境丹'),guard:res.guard||'',offering:res.offering||'',proxied:!!res.proxied,ambush:res.ambush||null,site:res.site||'',force:!!(res.odds&&res.odds.force),keep:!!(res.odds&&res.odds.keep),cicada:!!res.cicada,lgChange:res.lgChange||''}};
   if(S.engineDeath) judge.engineDeath=S.engineDeath;
   renderPanel(); saveGame();
@@ -4179,7 +4217,7 @@ function breakBlock(judge){
   const b=judge.breakRes; if(!b) return '';
   let s=`- 冲关：主角闭关冲击${b.ascend?'飞升':'下一关'}${b.pill?'，服下了'+b.pill:''}。引擎已判定【${b.success?(b.ascend?'飞升成功':'成功'):(b.died?'失败，身死道消':'失败')}】：`;
   if(b.lgChange) s+=`冲关之后，主角的灵根变了（${lgText(S.player.realm?S.player.linggen:null)}）：写出这一变化。`;
-  if(b.success) s+=b.ascend?`主角由${b.from}渡过最后一关，飞升。写出飞升的情景，gameOver填false（玩家可以继续玩）。`:`修为由${b.from}进至${b.to}。写出冲关的经过与成后的感受，不要写别的境界。`;
+  if(b.success) s+=b.dao?`主角由${b.from}再进一步，证道。写出证道的情景，gameOver填false（玩家可以继续玩）。`:b.ascend?`主角由${b.from}渡过最后一关，飞升有望，成了${b.to}。写出飞升的情景：劫云散尽，一道接引之光自天上落下。写到接引之光照在他身上为止——他还要安排身后事，下一回合才离开下界，不要写他已经到了仙界。${ascendKinNames()?'他在下界的至亲故旧：'+ascendKinNames()+'，写他们在不在场、知不知道。':''}gameOver填false（玩家可以继续玩）。`:`修为由${b.from}进至${b.to}。写出冲关的经过与成后的感受，不要写别的境界。`;
   else if(b.died) s+=`主角冲关失败而死。写清经过，gameOver填true并写ending。`;
   else if(b.cicada) s+=`本该身死道消，却像是有什么东西把这一刻抹了去：主角回过神来，人还坐在蒲团上，灵力也还在，只是竹笼里那只蝉没了声息。修为${b.dropped?'跌到'+b.to:'停在'+b.to}，要调养${b.cd}个月。写得恍惚，不点破。`;
   else if(b.proxied) s+=`本该身死，身外化身替他挡了这一劫，化身当场毁去；主角重伤，元气大伤，修为${b.dropped?'跌到'+b.to:'停在'+b.to}，要调养${b.cd}个月。`;
@@ -4363,17 +4401,17 @@ const ACTION_KINDS=[
 const RISKY_KINDS=['偷盗','潜行','欺诈','威吓','涉险'];   // 选项写成普通也要掷骰的
 function actionKind(text){ text=String(text||''); for(const [k,,re] of ACTION_KINDS) if(re.test(text)) return k; return ''; }
 function kindAttr(kind){ const x=ACTION_KINDS.find(a=>a[0]===kind); return x?x[1]:'谈吐'; }
-function rollCheck(attr,need,kind,free){
+function rollCheck(attr,need,kind,exact){
   const p=S.player;
   let val=attrVal(p,attr);
   if(S.destitute) val-=Math.round(5*fdm().starve);   // 饥寒交迫，做什么都差一口气
   val+=fdm().check;                                   // 自由度越高，主角越吃得开
   const tag=tagCheckMod(p,attr,kind); val+=tag;
-  const roll=d20(), dc=Math.max(20,snapNeed(need)+diff().dc);
+  const roll=d20(), dc=Math.max(20,(exact?num(need):snapNeed(need))+diff().dc);
   const total=val+rollMod(roll);           // 属性定基准，骰子给 ±40 的浮动
-  const crit=roll===20?'大成功':(roll===1&&!fdm().freeAct&&!free?'大失败':'');
-  const success=free||fdm().freeAct||roll===20||(roll!==1&&total>=dc);
-  return {attr,kind:kind||'',tag,val,roll,mod:rollMod(roll),need:dc,total,success,crit,free:!!free};
+  const crit=roll===20?'大成功':(roll===1&&!fdm().freeAct?'大失败':'');
+  const success=fdm().freeAct?true:(roll===20?true:(roll===1?false:total>=dc));
+  return {attr,kind:kind||'',tag,val,roll,mod:rollMod(roll),need:dc,total,success,crit};
 }
 
 /* ================= 宗门 ================= */
@@ -4436,7 +4474,9 @@ function sectTick(months){
   syncSect();
   if(!S.sect||S.sect.own) return;
   const before=sectRank(S.sect.contrib);
-  const pay=sectStipend()*months;
+  let pay;
+  if(inXianjie()){ S.payAcc=num(S.payAcc)+sectStipendX()*months; pay=Math.floor(S.payAcc); S.payAcc-=pay; }   // 仙宗月例一月不到一块仙晶
+  else pay=sectStipend()*months;
   S.player.money+=pay;
   // 当差记功：闭关的月份不算
   if(S.player.cultMode!=='闭关'){ S.sectDuty=num(S.sectDuty)+months*tagMul(S.player,'contrib'); const g=Math.floor(S.sectDuty); if(g>0){ S.sectDuty-=g; S.sect.contrib+=g; S.dutyLast=num(S.dutyLast)+g; } }
@@ -5366,7 +5406,7 @@ function recordWorldTurn(d, action, judge){
     }
   }
   for(const t of d.rumors||[]) rememberKnowledge(t,'风闻','未证实');
-  for(const u of d.npcUpdates||[])if(u.alive===false||u.relation||u.secretRevealed)changes.push(u.name+'：'+(u.alive===false?'亡故':u.relation||'秘密已揭开'));
+  for(const u of d.npcUpdates||[]){ const dead=u.alive===false&&!u._deathRejected, rel=u.relation&&!u._relRejected?u.relation:''; if(dead||rel||u.secretRevealed) changes.push(u.name+'：'+(dead?'亡故':rel||'秘密已揭开')); }
   for(const q of d.questUpdates||[])if(q.progress||q.status&&q.status!=='进行中')changes.push(q.title+'：'+(q.status&&q.status!=='进行中'?q.status:'进度'+q.progress));
   if(changes.length){
     S.consequences.push({turn:S.turn,action:plain(action).slice(0,240),changes});
@@ -5641,7 +5681,7 @@ function styleSystem(){
   const st=prose();
   return `你是一个修仙文字游戏的叙事引擎。本局文笔「${st.label}」：${st.rules}
 不管哪种文笔都守这几条：白描，人物不说出自己的动机；场景一笔，细节一处；段落短，手机上一段不超过四行；不堆辞藻，不写文言腔。对话用「」包裹，用前面的动作带出说话人。这是修仙不是武侠：见人先探修为，用的是储物袋、传音符、遁光、禁制，闭关以年计，人情底下是利害。
-这些词不要用（引擎会查，用了打回重写）：${styleBanned().join('、')}。
+这些词尽量不用：${styleBanned().join('、')}。
 
 下面两段是本局文笔的范例，同一件事换别的文笔会写得完全不同。只学笔法与节奏，不要抄内容：
 
@@ -5780,7 +5820,7 @@ function clanBlock(){
 - 门下${ds.length}人（能战${clanFighters().length}人）。挑得出头的：${top}。${(c.fallen||[]).length?`近来去的人：${c.fallen.slice(-4).map(x=>x.name+'('+x.how+')').join('、')}。`:''}
 - ${(c.annexed||[]).length?`已吞并：${c.annexed.join('、')}。`:''}${(c.allies||[]).length?`已臣服本派：${c.allies.join('、')}。`:''}${rivals.length?`尚未低头的：${rivals.map(f=>f.name).join('、')}。`:''}
 - ${c.unified?'主角已一统修真界，天下再无与之抗礼者。':(c.leagueLeader?'主角是当世修真界盟主。':`战史 ${num(c.wins)} 胜 ${num(c.losses)} 负。`)}${lastWar?`最近一仗：${lastWar.result==='lose'?'败于':'胜'}${lastWar.foe}。`:''}
-- 写到宗门时：弟子可以在剧情里说话、办事、出岔子、送命，这些都写得；但宗门的势力、威望、公帐、弟子人数与武功全由引擎记账，不要在任何字段里改动，也不要凭空说宗门壮大了或垮了。`;
+- 写到宗门时：弟子可以在剧情里说话、办事、出岔子、受伤，这些都写得；弟子的生死由引擎结算，宗门战、斗法里死了的才是死了；但宗门的势力、威望、公帐、弟子人数与武功全由引擎记账，不要在任何字段里改动，也不要凭空说宗门壮大了或垮了。`;
 }
 // 给模型看的家室：正室、妾室、恋人、子女与称呼、谁有孕
 function familyBlock(){
@@ -5878,7 +5918,8 @@ function stateBlocks(action){
   const quests=S.quests.length?S.quests.map(q=>`- ${q.title}（${q.status}，进度${q.progress}）：${q.desc}`).join('\n'):'（无）';
   const world=S.world&&S.world.ranking&&S.world.ranking.length?`${rankName()}：${S.world.ranking.map((r,i)=>`${i+1}.${r.name}(${r.gender?r.gender+',':''}${num(r.age)?num(r.age)+'岁,':''}${r.faction||'散修'}${r.realm?','+realmText(r.realm):''}${r.alive===false?',已陨落':''})`).join('；')}${num(S.world.vacant)>0?`\n榜上尚有${S.world.vacant}个空缺（有人辞世或跌出），可用rankingAdd补进一位有来历的新高手（武功须与榜末相当）`:''}${(S.world.fallen||[]).length?`\n已故的榜上人物：${S.world.fallen.slice(-6).map(x=>x.name).join('、')}`:''}\n势力：${(S.world.factions||[]).map(f=>`${f.name}(${f.alignment},势力${f.power},首领${f.leader}${(()=>{ const x=f.own?[]:[f.lGender,f.lAge?num(f.lAge)+'岁':'',f.lRealm?realmText(f.lRealm):''].filter(Boolean); return x.length?`[${x.join(',')}]`:''; })()})`).join('；')}${hiddenList().filter(h=>h&&h.alive!==false).length?`\n隐世高人（不上修士榜，平时不露面，没有引擎安排不要写他们出场）：${hiddenList().filter(h=>h&&h.alive!==false).map(h=>`${h.name}(${h.gender},${h.faction||'散修'},${realmText(h.realm)},${h.home||''})`).join('；')}`:''}${(S.world.tianjiao||[]).filter(t=>t&&t.alive!==false).length?`\n天骄榜：${S.world.tianjiao.filter(t=>t&&t.alive!==false).map(t=>`${t.name}(${t.gender},${num(t.age)}岁,${t.faction||'散修'},${realmText(t.realm)})`).join('；')}`:''}\n以上人物的性别、年龄、境界以此为准，写到他们时照着写。`:'（尚未铸造）';
   avSlotOf(p);
-  const pb=Object.assign({},p); delete pb.backstory; delete pb.avatar; delete pb.avatarLocked;
+  const pb=Object.assign({},p); delete pb.backstory; delete pb.avatar; delete pb.avatarLocked; delete pb.customAvatar;
+  if(customAvatarOf(p)) delete pb.portrait;
   for(const k of ['realm','linggen','lingli','breakCD','lifeBonus','cultMode','cultMul','scarPower','bottleneckNoted','lifespan','tags','prep']) delete pb[k];
   pb.attributes=Object.assign({},p.attributes); delete pb.attributes['武功'];
   if(p.items){ pb.items={}; for(const c in p.items) pb.items[c]=(c==='法器'||c==='玉简'?(p.items[c]||[]).map(it=>({item:it,count:1})):stackItems(p.items[c])).map(({item:it,count})=>{ if(!it||typeof it!=='object') return it; const o=Object.assign({},it); delete o.bonus; if(count>1) o.count=count; return o; }); }
@@ -5938,7 +5979,6 @@ function judgeBlock(judge){
   if(judge.check){
     const c=judge.check;
     s+=`- 属性判定${c.kind?'（'+c.kind+'）':''}：${c.attr}${c.val}${c.tag?'（含标签'+(c.tag>0?'+':'')+c.tag+'）':''}，掷骰${c.roll}（修正${c.mod>=0?'+':''}${c.mod}）＝${c.total}，难度${c.need}，判定【${c.success?'成功':'失败'}】${c.crit?'（'+c.crit+'）':''}。剧情必须如实体现这个结果。\n`;
-    if(c.success&&c.free) s+=`  这是玩家自由输入的行动：必须办成、照玩家写的拿到结果，不许打折、不许找补。\n`;
     if(!c.success&&fdm().freeAct) s+=`  本局口径宽松：失败只写成绕了弯路、小小丢脸、暂时没成，不必伤筋动骨。\n`;
     if(!c.success&&!fdm().freeAct) s+=`  判定失败：这回合没有到手的东西。灵力、灵石、功法、物品、贡献、属性上涨一概不给（给了引擎也不收），只能得到消息、看清局面、或人情冷暖上的变化；可以写代价。\n`;
   }else if(judge.duel||judge.convo){
@@ -5952,6 +5992,8 @@ function judgeBlock(judge){
   }
   s+=realmBlock(judge);
   s+=breakBlock(judge);
+  s+=arriveBlock(judge);
+  s+=planeTripBlock(judge);
   if(judge.craft) s+=`- 本回合主角在${judge.craft.kind==='avatar'?'炼制身外化身':'布渡劫阵'}，上面那次判定就是成败：${judge.craft.success?'成了，写成形的经过':'没成，材料毁了一半，写出哪里出了岔子'}。\n`;
   if(judge.debtId){ const db=(S.debts||[]).find(x=>x.id===judge.debtId); if(db) s+=`- 本回合主角在替${db.npc}还人情：${db.ask?db.ask.text:'办他托付的事'}。写清办的是什么事、怎么办成的。\n`; }
   if(!judge.convo) s+=`- 世界事件：${judge.worldEvent?judge.worldEvent+'（可作为远方风闻，不能打断玩家行动）':'无'}\n`;
@@ -5959,7 +6001,7 @@ function judgeBlock(judge){
   s+=`- 主角气血：${S.player.hp}/${hpMaxOf(S.player)}${S.player.hp<30?'（重伤，行动受限）':''}\n`;
   if(judge.study){
     const st=judge.study;
-    s+=`- 闭关参悟《${st.manual}》（${st.style}一路）：悟性神识${st.roll.val}+骰${st.roll.roll}=${st.roll.total} vs 难度${st.roll.dc}，判定【${st.success?'成功':'失败'}】${st.crit?'（'+st.crit+'）':''}。引擎已结算：${st.outcome}。剧情必须如实写出这场闭关的经过与结果，不许改写成败。\n`;
+    s+=`- 闭关参悟《${st.manual}》（${st.recipe?st.recipe+'方谱，不是功法，参透了是记熟了方子，不会多出一门功法':st.style+'一路'}）：悟性神识${st.roll.val}+骰${st.roll.roll}=${st.roll.total} vs 难度${st.roll.dc}，判定【${st.success?'成功':'失败'}】${st.crit?'（'+st.crit+'）':''}。引擎已结算：${st.outcome}。剧情必须如实写出这场闭关的经过与结果，不许改写成败。\n`;
   }
   if(judge.convo){
     s+=`- 本回合是刚才那场面谈的余波：只写谈完之后的短短一段（150-250字），不要重述对话内容，也不要另起炉灶讲别的事；写这场话带来的实际变化、在场旁人的反应、以及接下来该往哪去。\n`;
@@ -5970,7 +6012,7 @@ function judgeBlock(judge){
   }
   const mo=judge.months==null?1:judge.months;
   if(!judge.convo) s+=`- 本回合历时：${durationText(mo)}（引擎推进时间，你不要写具体年月，只按这段光阴的长短来铺陈剧情的节奏）\n`;
-  if(!judge.convo) s+=`- 生计：身上${S.player.money}块下品灵石，每月开销约${upkeepPerMonth()}块，这段时间的开销按满月累计${S.player.money<upkeepPerMonth()*mo?'——钱不够了，剧情须写出捉襟见肘':''}`;
+  if(!judge.convo) s+=`- 生计：身上${S.player.money}块${moneyUnit()}（花钱买东西不能超过这个数，买不起就写成没买成、少买或赊账），${upkeepText()}，这段时间的开销按满月累计${S.player.money<(inXianjie()?xianUpkeepF():upkeepPerMonth())*mo?'——钱不够了，剧情须写出捉襟见肘':''}`;
   return s;
 }
 
@@ -5988,7 +6030,7 @@ function tailReminder(){
   return `【本回合要点（写之前再看一眼）】
 - 剧情紧接上回，沿玩家这回的行动往前走一步：成果、代价、消息、人物态度至少变一样；不许原地抒情、反复回想、重申决心凑字数。字数照【推演要求】。
 - 引擎判定是定局：判定失败就写没成、东西没到手；有判定时check原样照填。
-- 人物名册里的人，性别、年龄、境界、出身、宗门、和主角的关系一律照账上写，不许改；npcUpdates、scene.present、duel.opponent里一律写名册上的全名；玩家括号里写明的是定论。主角的师门、师父以【师门】为准，不许另造，不许替主角拜师、改投门派。
+- 人物名册里的人，性别、年龄、境界、出身、宗门、和主角的关系一律照账上写，不许改；npcUpdates、scene.present、duel.opponent里一律写名册上的全名。玩家这回在括号里改了某人的哪一项，那一项以括号为准（引擎会照括号改账），括号没提到的照旧照账上写。主角的师门、师父以【师门】为准，不许另造，不许替主角拜师、改投门派。
 - 必写：scene（含present）、本回打过交道的人的npcUpdates、options（3至5个，至少两种类型）。
 - 只输出那一个JSON对象。`;
 }
@@ -6237,14 +6279,15 @@ function llmTransient(e){
 }
 async function callLLM(prompt, onPartial, opt){
   opt=opt||{};
-  const tries=opt.noRetry?1:3;
+  const tries=opt.noRetry?1:3, bud=opt.budget;
   for(let i=0;;i++){
+    if(bud){ if(bud.left<=0||Date.now()>bud.until) throw new Error('接口调用失败（这一回的请求次数用完了，点重试接着写）'); bud.left--; }
     try{
       const raw=await callLLMOnce(prompt,onPartial,opt);
       if(!String(raw||'').trim()) throw new Error('接口调用失败（模型返回了空回复）');
       return raw;
     }catch(e){
-      if(i>=tries-1||!llmTransient(e)||(opt.signal&&opt.signal.aborted)) throw e;
+      if(i>=tries-1||!llmTransient(e)||(opt.signal&&opt.signal.aborted)||(bud&&(bud.left<=0||Date.now()>bud.until))) throw e;
       if(typeof toast==='function') toast(/429/.test(e.message)?'接口繁忙，稍等片刻自动重发……':'连接不稳，正在自动重发……');
       await new Promise(r=>setTimeout(r,i?4000:1500));
       if(opt.signal&&opt.signal.aborted) throw e;
@@ -6799,9 +6842,10 @@ function styleFix(d,st,final){
   const bad=styleIssues(d[f],st.kind,st);
   if(!bad.length) return {};
   const r=st.noLen?null:styleRange(st.kind), n=proseLen(d[f]);
-  const wild=r&&(n<r[0]*0.5||n>r[1]*1.8);
+  const wild=r&&n<r[0]*0.5;   // 10-09：只有太短（内容不够）才重写；写长了照收
   const hits=styleBanned().filter(w=>d[f].includes(w)).length;
-  styleLog(st.kind,bad); return {};   // 10-08 作者更新：文风一律不重写，只记日志（重写太伤体验）
+  if(!final&&!st.redone&&(wild||hits>=3)){ st.redone=true; styleLog(st.kind,bad); return {redo:bad}; }   // 10-09：重的才打回，只打回一次
+  styleLog(st.kind,bad); return {};
 }
 function turnStyleKind(judge,extra){
   extra=extra||{};
@@ -7069,7 +7113,7 @@ function normNpcBody(n){
    规范 3.1/3.3/3.6/7：五维每回合 ±3；奇遇灵力写实500/传奇1500/随心不限；贡献每回合 ≤20；
    法器功法品阶不高于本境对应阶。超出的截断，不打回，台账里记一行。 */
 const TURN_ATTR_CAP=3, TURN_CONTRIB_CAP=20, NEW_ART_LEVEL_CAP=30;
-function gradeCapFor(p){ const m=p&&p.realm&&p.realm.major>=0?p.realm.major:0; return m<=1?3:(m<=3?6:(m<=5?9:12)); }
+function gradeCapFor(p){ const m=p&&p.realm&&p.realm.major>=0?p.realm.major:0; if(m>=XIAN_PLANE_MAJOR) return 15+(Math.min(XIAN_TOP,m)-XIAN_PLANE_MAJOR)*3; return m<=1?3:(m<=3?6:(m<=5?9:12)); }
 const BANNED_TO={'！！':'！','！':'。','心想':'想','暗想':'想','心中暗道':'心道','首先':'先','其次':'再','叮！':'','倒吸一口凉气':'吸了口气','众人震惊':'众人一愣','心中一暖':'心里一松','心头一暖':'心里一松'};
 function appendNote(n,t){
   t=plain(t); if(!t) return; const cur=plain(n.notes);
@@ -7103,7 +7147,7 @@ function npcGuard(n,u,ctx){
     else if(PAST_REL.test(nr)||bloodRel(nr)) why='后来认识的人不会变成旧识、亲眷';
     else if(/师父|师尊|师傅|恩师|徒弟|徒儿|^弟子$/.test(nr)&&!/拜师|拜.{0,6}为师|收.{0,4}(?:为徒|徒弟|门下|为弟子)|拜师礼|认.{0,3}师父|入门/.test(all)) why='没有拜师收徒的经过';
     else if(/师兄|师姐|师弟|师妹|同门|师叔|师伯/.test(nr)&&!(S.sect&&plain(n.faction)===S.sect.name)&&!/同门|入门|拜入/.test(all)) why='不是同门';
-    if(why) guardNote(`${n.name}的关系不改成「${nr}」（${why}）`); else out.relation=nr;
+    if(why) guardNote(`${n.name}的关系不改成「${nr}」（${why}）`); else { const parts=nr.split(/[，,；;、]/); out.relation=parts[0]; if(parts.length>1&&typeof appendNote==='function') appendNote(n,parts.slice(1).join('，')); }
   }
   const wr=typeof worldRecordOf==='function'?worldRecordOf(S,n.name):null;
   const moved=all.includes(n.name)&&/拜入|入门|加入|投入|投奔|改投|叛出|叛离|逐出|离开.{0,6}(?:宗|门|派|谷|山|阁|宫|家)|收入门下|收为(?:徒|弟子)/.test(all);
@@ -7953,17 +7997,18 @@ function npcKit(n){
 }
 
 // 一门功法 → 一个技能。同路数只取最熟的那门。
-function adSkillsFrom(arts){
-  const best={};
-  for(const a of arts||[]){ if(!a||!ART_STYLES.includes(a.style)) continue; if(!best[a.style]||num(a.level)>num(best[a.style].level)) best[a.style]=a; }
-  const out=[], L=a=>clamp(num(a.level));
-  if(best['神通']){ const l=L(best['神通']); out.push({name:best['神通'].name,style:'神通',cat:'sure',cd:4,cur:1,qi:40,mult:1.8+l/125,pierce:1}); }
-  if(best['护体']){ const l=L(best['护体']); out.push({name:best['护体'].name,style:'护体',cat:'sure',cd:3,cur:0,qi:10,shield:12+l/4,heal:l>=50?5+Math.round(l/10):0}); }
-  if(best['攻伐']){ const l=L(best['攻伐']); out.push({name:best['攻伐'].name,style:'攻伐',cat:'active',rate:Math.min(0.6,0.35+l/400),qi:5,mult:1.3+l/200}); }
+function adSkillsFrom(arts,p){
+  const best={}, eg=a=>gradePow(gradeIndex(a&&a.grade)||1,p);
+  for(const a of arts||[]){ if(!a||!ART_STYLES.includes(a.style)) continue; const b=best[a.style];   // 10-10：招式带上五行，实录里配颜色
+    if(!b||eg(a)>eg(b)+1e-9||(Math.abs(eg(a)-eg(b))<1e-9&&num(a.level)>num(b.level))) best[a.style]=a; }
+  const out=[], L=a=>clamp(num(a.level)), G=a=>1+0.06*Math.max(0,eg(a)-3);   // 黄阶照旧，从玄阶起每档 +6%（天阶上品 ×1.54）
+  if(best['神通']){ const a=best['神通'], l=L(a); out.push({name:a.name,element:a.element||'',style:'神通',cat:'sure',cd:4,cur:1,qi:40,mult:(1.8+l/125)*G(a),pierce:1}); }
+  if(best['护体']){ const a=best['护体'], l=L(a); out.push({name:a.name,element:a.element||'',style:'护体',cat:'sure',cd:3,cur:0,qi:10,shield:(12+l/4)*G(a),heal:l>=50?Math.round((5+Math.round(l/10))*G(a)):0}); }
+  if(best['攻伐']){ const a=best['攻伐'], l=L(a); out.push({name:a.name,element:a.element||'',style:'攻伐',cat:'active',rate:Math.min(0.6,0.35+l/400),qi:5,mult:(1.3+l/200)*G(a)}); }
   if(best['诡术']){
     const a=best['诡术'], l=L(a), t=a.name+(a.desc||'');
     const st=/穴|点|封|定|缚|禁|困/.test(t)?'stun':/毒|蛊|蚀|腐|蝎|蛇|磷/.test(t)?'poison':'chaos';
-    out.push({name:a.name,style:'诡术',cat:'active',rate:Math.min(0.55,0.3+l/400),qi:8,mult:0.9,st,stChance:0.45+l/400});
+    out.push({name:a.name,element:a.element||'',style:'诡术',cat:'active',rate:Math.min(0.55,0.3+l/400),qi:8,mult:0.9*G(a),st,stChance:Math.min(0.95,0.45+l/400+(G(a)-1)*0.25)});
   }
   return {skills:out, best};
 }
@@ -7987,15 +8032,18 @@ function adUnit(side,o){
 // 开打前把双方都折成战斗单位，写进 duel.eng（纯数据，能进存档）
 function adBuild(d){
   const p=S.player, o=d.opp;
-  const pk=adSkillsFrom(p.arts), ok=adSkillsFrom(npcKit(o));
+  const pk=adSkillsFrom(p.arts,p), ok=adSkillsFrom(npcKitLive(o),o);
   const pr=d.profile;
-  const w=(p.items['法器']||[]).slice().sort((a,b)=>num(b.bonus)-num(a.bonus))[0];
-  const md=majorOf(p)-majorOf(o), mk=AD_MAJOR*adScale(), leap=tagAdd(p,'leap')*3.1*adScale();   // 天资卓绝：越一小阶
-  const P=adUnit('p',{name:p.name,hp:d.pHp,qi:d.pQi,W:d.pW+leap+Math.max(0,md)*mk,best:pk.best,skills:pk.skills,weapon:w?w.name:'',
+  const w=(p.items['法器']||[]).slice().sort((a,b)=>gradePow(num(b.bonus),p)-gradePow(num(a.bonus),p))[0];
+  // 10-12：仙凡之隔。一边是仙人、一边是下界的人：仙人一方战力接在下界尺子顶上（+100），大境界差再多算两层
+  const xp=majorOf(p)>=XIAN_PLANE_MAJOR, xo=majorOf(o)>=XIAN_PLANE_MAJOR, cross=xp!==xo&&majorOf(p)>=0&&majorOf(o)>=0;
+  const md=majorOf(p)-majorOf(o)+(cross?(xp?2:-2):0), mk=AD_MAJOR*adScale(), leap=tagAdd(p,'leap')*3.1*adScale();
+  const bridgeP=cross&&xp?100*adScale():0, bridgeO=cross&&xo?100*adScale():0;   // 天资卓绝：越一小阶
+  const P=adUnit('p',{name:p.name,hp:d.pHp,qi:d.pQi,W:d.pW+bridgeP+leap+Math.max(0,md)*mk,best:pk.best,skills:pk.skills,weapon:w?w.name:'',
     med:duelPillIndex(p)>=0, hpMax:hpMaxOf(p), first:hasTag(p,'杀伐果断')||undefined, atkMul:tagMul(p,'atk'), escape:tagAdd(p,'escape')+num((p.eggFx||{}).escape), rage:(p.eggFx||{}).rageAtk||0, shield0:(p.eggFx||{}).duelShield||0, relic:1, lame:hasScar('跛足'), spdMod:hasScar('跛足')?-((d.pW/adScale())*0.15):0});
   const sig=String(o.signature||'').replace(/[「」《》【】]/g,'');
-  const O=adUnit('o',{name:o.name,hp:d.oHp,qi:d.oQi,W:d.oppW+Math.max(0,-md)*mk,best:ok.best,skills:ok.skills,weapon:sig,
-    spdMod:(/轻|灵|活|跳脱|机敏/.test((o.personality||[]).join(''))?4:0)-(pr.def?3:0),
+  const O=adUnit('o',{name:o.name,hp:d.oHp,qi:d.oQi,W:d.oppW+bridgeO+Math.max(0,-md)*mk,best:ok.best,skills:ok.skills,weapon:sig,
+    spdMod:(/轻|灵|活|跳脱|机敏/.test(persArr(o.personality).join(''))?4:0)-(pr.def?3:0),
     critMod:pr.trick?0.03:pr.agg?0.02:0});
   // 致敬物在斗法里的效果
   if(relicHas(p,'bamboo')&&num(p.attributes['神识'])>=50) P.swarm=1;
@@ -8022,7 +8070,7 @@ function adPick(u){
 }
 function adDmg(E,a,t,mult,beat,opt){
   opt=opt||{};
-  if(!opt.sure&&Math.random()<t.dodge){ beat.txt.push(`${adWho(t)}身形一晃避开了`); beat.miss=true; return 0; }
+  if(!opt.sure&&Math.random()<t.dodge){ beat.txt.push(adSay(t,'dg',[`${adWho(t)}遁光一闪，让开了`,`${adWho(t)}身前灵光一折，打偏了`,`${adWho(t)}身形化作一道虚影，避开了`])); beat.miss=true; return 0; }
   const gap=(a.wn+a.atkB-(a.st.poison?5:0))-(t.wn+t.defB);
   let d=AD.base*mult*Math.min(AD.hi,Math.max(AD.lo,Math.exp(gap/AD.gapK)))*(1+(Math.random()*2-1)*AD.var);
   let crit=false;
@@ -8034,10 +8082,10 @@ function adDmg(E,a,t,mult,beat,opt){
   if(t.shield>0&&!opt.pierce){
     const ab=Math.min(t.shield,d); t.shield-=ab; d-=ab;
     const rf=Math.round(ab*0.2);
-    if(ab) beat.txt.push(`护体灵光挡下${ab}`);
-    if(rf>0&&a.hp>0){ a.hp=Math.max(0,a.hp-rf); beat.hits.push({who:a.side,dmg:rf,rf:1}); beat.txt.push(`反震${adWho(a)}${rf}`); }
+    if(ab) beat.txt.push(`${adWho(t)}的护体灵光挡下${ab}`);
+    if(rf>0&&a.hp>0){ a.hp=Math.max(0,a.hp-rf); beat.hits.push({who:a.side,dmg:rf,rf:1}); beat.txt.push(`灵光反激回去，${adWho(a)}被震得${rf}`); }
     if(t.shield<=0){ t.shield=0; t.shieldDur=0; }
-  }else if(t.shield>0&&opt.pierce){ beat.txt.push('护体灵光被一击打散'); t.shield=0; t.shieldDur=0; }
+  }else if(t.shield>0&&opt.pierce){ beat.txt.push(`${adWho(t)}的护体灵光被一击打散`); t.shield=0; t.shieldDur=0; }
   if(d>0){ t.hp=Math.max(0,t.hp-d); beat.hits.push({who:t.side,dmg:d,crit}); }
   if(crit) beat.crit=true;
   return d;
@@ -8048,8 +8096,8 @@ function adStatus(t,st,chance,beat){
   else { t.st[st]=1; t.stRes=Math.min(0.75,t.stRes+AD.chaosResist); beat.txt.push(st==='stun'?`${adWho(t)}被禁制定住`:`${adWho(t)}神识被扰`); }
 }
 function adNormalName(u){
-  if(u.side==='p') return u.weapon?`${u.weapon}·${pick(['横扫','直刺','斜劈','御使'])}`:pick(['一记掌心雷','胡乱拍出的一掌','抡圆了的一拳']);
-  return pick(['一道法诀','连发三记火球','劈面一掌','祭出飞针','欺身直进']);
+  if(u.side==='p') return u.weapon?`${u.weapon}·${pick(['御使','祭起','催动'])}`:pick(['一记掌心雷','一道火弹','一张符']);
+  return pick(['一道法诀','连发三记火弹','一道乌光','祭出飞针','一张符']);
 }
 function adStTxt(u){ const t=[]; if(u.st.poison) t.push('中毒'); if(u.st.stun) t.push('受制'); if(u.st.chaos) t.push('心乱'); return t; }
 function adSnap(E,beat){ beat.after={pHp:E.P.hp,oHp:E.O.hp,pQi:E.P.qi,oQi:E.O.qi,pSh:E.P.shield,oSh:E.O.shield,pSt:adStTxt(E.P),oSt:adStTxt(E.O),
@@ -8066,21 +8114,21 @@ function adAct(E,u,d){
   if(u.side==='p'&&E.flee){
     E.flee=false;
     const pv=u.wn+d20()+6+Math.min(12,Math.round(u.flee/8))+Math.min(6,E.round*1.5)+(u.hp<=30?5:0)-(u.lame?8:0), ov=t.wn+Math.min(12,Math.round(t.flee/8))+d20();
-    if(pv>ov||(u.escape&&Math.random()<u.escape/100)){ beat.txt.push('你虚晃一招跃出圈外，头也不回地去了'); beat.end='escape'; adSnap(E,beat); return beat; }
-    beat.txt.push(`你转身欲走，却被${t.name}追上`); adDmg(E,t,u,1.2,beat,{sure:true}); adSnap(E,beat); return beat;
+    if(pv>ov||(u.escape&&Math.random()<u.escape/100)){ beat.txt.push('你捏碎一张遁符，化作遁光脱出战团'); beat.end='escape'; adSnap(E,beat); return beat; }
+    beat.txt.push(`你遁光刚起，被${t.name}一道法诀截了下来`); adDmg(E,t,u,1.2,beat,{sure:true}); adSnap(E,beat); return beat;
   }
   // 对手想溜
   if(u.side==='o'&&u.hp<=30&&(d.profile.coward||d.profile.trick||d.opp.alignment==='邪道')&&!d.friendly&&Math.random()<0.25){
-    if(u.wn+Math.min(12,Math.round(u.flee/8))+d20()+6>t.wn+Math.min(12,Math.round(t.flee/8))+d20()){ beat.txt.push(`${u.name}虚晃一招，脚下生风转眼没了踪影`); beat.end='oppEscape'; adSnap(E,beat); return beat; }
-    beat.txt.push(`${u.name}想溜，被你一步赶上`); adDmg(E,t,u,1.2,beat,{sure:true}); adSnap(E,beat); return beat;
+    if(u.wn+Math.min(12,Math.round(u.flee/8))+d20()+6>t.wn+Math.min(12,Math.round(t.flee/8))+d20()){ beat.txt.push(`${u.name}化作一道遁光往天边去了`); beat.end='oppEscape'; adSnap(E,beat); return beat; }
+    beat.txt.push(`${u.name}遁光刚起，你遁光一催追了上去`); adDmg(E,t,u,1.2,beat,{sure:true}); adSnap(E,beat); return beat;
   }
   if(u.st.stun){ delete u.st.stun; beat.txt.push(`${me}被禁制困住，动弹不得`); adSnap(E,beat); return beat; }
-  if(u.st.chaos){ delete u.st.chaos; beat.txt.push(`${me}心神大乱，一招打在空处`); adSnap(E,beat); return beat; }
+  if(u.st.chaos){ delete u.st.chaos; beat.txt.push(`${me}神识被扰，一道法诀打偏了`); adSnap(E,beat); return beat; }
   // 自动吞药：气血头一回跌破 35
   if(u.side==='p'&&u.med&&!u.medUsed&&u.hp<35){
     const mi=duelPillIndex(S.player), med=mi>=0?S.player.items['丹药'][mi]:null;
     u.medUsed=true;
-    if(med){ S.player.items['丹药'].splice(mi,1); const h=Math.min((u.hpMax||100)-u.hp,rnd(24,40)); u.hp+=h; beat.hits.push({who:'p',heal:h}); beat.txt.push(`你退开半步吞下【${med.name}】，伤处一阵温热`); beat.skill='服药'; adSnap(E,beat); return beat; }
+    if(med){ S.player.items['丹药'].splice(mi,1); const h=Math.min((u.hpMax||100)-u.hp,rnd(24,40)); u.hp+=h; beat.hits.push({who:'p',heal:h}); beat.txt.push(`你抽空吞下【${med.name}】，伤处一阵温热`); beat.skill='服药'; adSnap(E,beat); return beat; }
   }
   const sk=adPick(u);
   u.qi=clamp(u.qi-(sk?sk.qi:0));
@@ -8090,16 +8138,17 @@ function adAct(E,u,d){
     if(u.side==='p'){ d.artUse=d.artUse||{}; d.artUse[sk.name]=(d.artUse[sk.name]||0)+1; }
     if(sk.shield){
       u.shield=Math.round(sk.shield); u.shieldDur=3;
-      beat.txt.push(`${me}运起「${sk.name}」，一层灵光罩住周身`);
+      { const c=EL_COLOR[sk.element||artElement(sk.name)]||EL_COLOR[unitEl(u)]||''; beat.txt.push(adSay(u,'sh',[`${me}运起「${sk.name}」，一层${c||'灵'}光罩住周身`,`${me}掐诀运起「${sk.name}」，护体灵光${c?'泛起'+c+'色，':''}又厚了一层`])); }
       if(sk.heal){ const h=Math.min((u.hpMax||100)-u.hp,sk.heal); if(h>0){ u.hp+=h; beat.hits.push({who:u.side,heal:h}); } }
     }else{
-      beat.txt.push(sk.style==='神通'?`${me}倾力施出绝招「${sk.name}」`:`${me}使一招「${sk.name}」`);
+      if(sk.style==='神通'){ const e=sk.element||artElement(sk.name)||unitEl(u); beat.txt.push(`${me}法诀一变，施出「${sk.name}」，${EL_STIR[e]||EL_STIR[' ']}`); }
+      else beat.txt.push(adSay(u,'atk',[`${me}掐诀催动「${sk.name}」`,`${me}一声低喝，「${sk.name}」应声而出`,`「${sk.name}」从${me}指间打了出去`]));
       const dm=adDmg(E,u,t,sk.mult*(sk.style==='攻伐'?(u.atkMul||1):1)*(sk.style==='神通'?(u.godMul||1):1),beat,{pierce:sk.pierce});
       if(dm>0&&sk.st&&t.hp>0) adStatus(t,sk.st,sk.stChance,beat);
       if(dm>0&&u.swarm&&sk.style==='攻伐'&&t.hp>0&&Math.random()<0.1){ beat.txt.push('匣中竹叶小剑一涌而出，又补了一下'); adDmg(E,u,t,0.6,beat,{}); }
     }
   }else{
-    beat.txt.push(`${me}以「${adNormalName(u)}」${u.side==='p'?'抢攻':'直取要害'}`);
+    beat.txt.push(adNormalLine(u,t));
     adDmg(E,u,t,1,beat);
   }
   adSnap(E,beat);
@@ -8184,7 +8233,7 @@ function adRound(d){
 function startDuel(opp, o){
   o=o||{};
   const p=S.player;
-  const oppW=clampW(opp['武功']+diff().opp);
+  const oppW=clampW(opp['武功']+diff().opp+(o.noGear?0:npcGearBonus(opp)));
   duelStop();
   duel={
     opp, lethal:!!o.lethal, reason:o.reason||'', action:o.action||`与${opp.name}斗法`, judge:o.judge||null, vendetta:o.vendetta||null, war:!!o.war,
@@ -8196,7 +8245,7 @@ function startDuel(opp, o){
   $('duelTitle').textContent=(duel.friendly?'切磋':'斗法')+' · '+opp.name;
   $('duelSub').textContent=(duel.reason||'')+(duel.lethal?'　⚠ 对方不会留手，此战可能致命':'　点到为止');
   { const pr=p.realm, orr=npcRealmOf(opp), gap=(orr?realmIndex(orr):0)-(pr?realmIndex(pr):0), bigGap=orr&&pr&&orr.major!==pr.major;
-    const feel=(bigGap&&gap>0)?'灵压沉沉压过来，境界比你高出一截':(bigGap&&gap<0)?(orr.major<0?'只是凡人，经不起修士一击，出手要留分寸':`修为比你低了${['','一','两','三','四','五','六','七'][pr.major-orr.major]||(pr.major-orr.major)}个大境界，但不可轻敌`):gap>=3?'气息比你浑厚不少':gap<=-3?'气息比你弱些，不可轻敌':'与你修为相仿，胜负难料';
+    const feel=(bigGap&&gap>0)?'灵压沉沉压过来，境界比你高出一截':(bigGap&&gap<0)?(orr.major<0?'只是凡人，经不起修士一击，出手要留分寸':`修为比你低了${['','一','两','三','四','五','六','七','八','九','十'][pr.major-orr.major]||(pr.major-orr.major)}个大境界${isXianRealm(pr)&&!isXianRealm(orr)?'，又隔着仙凡之别':''}，但不可轻敌`):gap>=3?'气息比你浑厚不少':gap<=-3?'气息比你弱些，不可轻敌':'与你修为相仿，胜负难料';
     $('duelLog').innerHTML=`<div class="r sys">${esc(opp.name)}${feel}。你${pr?realmText(pr):''}，战力${duel.pW}（含法器）；对方${orr?realmText(orr):'境界不明'}，战力约${duel.oppW}。</div>`; }
   renderDuel();
   $('duelMask').classList.add('on');
@@ -8261,7 +8310,7 @@ function duelChips(u,cds,right){
     return `<span class="dchip${wait?' wait':''}" style="--c:${AD_STYLE_COLOR[s.style]||'var(--ink)'}" title="${esc(s.style)}${s.cat==='sure'?'·必中·冷却'+s.cd:'·几率出手'}"><b>${esc(s.name)}</b><i>${tag}</i></span>`;
   });
   if(u.flee) sk.push(`<span class="dchip" style="--c:var(--ink-soft)" title="遁术·首回合先手，更难被打中"><b>${esc((u.side==='p'?(adSkillsFrom(S.player.arts).best['遁术']||{}).name:(npcKit(duel.opp).find(k=>k.style==='遁术')||{}).name)||'遁术')}</b><i>被动</i></span>`);
-  if(!sk.length) sk.push(`<span class="dchip none">${u.side==='p'?'无功法，只凭拳脚':'只凭拳脚'}</span>`);
+  if(!sk.length) sk.push(`<span class="dchip none">${u.side==='p'?'无功法，只凭法器和粗浅法诀':'只凭法器和粗浅法诀'}</span>`);
   return `<div class="dchips${right?' r':''}">${sk.join('')}</div>`;
 }
 function renderDuel(onlyFighters){
@@ -8322,7 +8371,7 @@ function beatMs(b,round){
 }
 function roundHtml(n){ return `<div class="r" data-rn="${n}"><span class="rn">第${cnNum(n)}回合</span></div>`; }
 function beatHtml(b,him){
-  const tag=h=>h.dot?'毒':h.rf?'反震':h.crit?'重击':'';
+  const tag=h=>h.dot?'毒':h.rf?'反激':h.crit?'重击':'';
   const hs=b.hits.map(h=>h.heal?`<span class="heal">${h.who==='p'?'你':esc(him)} +${h.heal}</span>`:`<span class="dmg${h.crit?' crit':''}">${h.who==='p'?'你':esc(him)}${tag(h)?'·'+tag(h):''} -${h.dmg}</span>`).join('　');
   return `<span class="bt">${esc(b.txt.join('，'))}。${hs?' '+hs:''}</span>`;
 }
@@ -8415,14 +8464,14 @@ function showWinChoice(){
     { const o=duel.opp; if(o.realm&&o.realm.major>=0){ for(let k=0;k<3;k++){ if(o.realm.major===0&&o.realm.minor<=1) break; if(o.realm.minor>1) o.realm.minor--; else { o.realm.major--; o.realm.minor=realmMinorMax(o.realm.major); } } o.realm.perfect=false; o.lingli=0; syncPower(o); } }
     duel.opp.notes=(duel.opp.notes?duel.opp.notes+'；':'')+`被${S.player.name}毁了道基，修为跌到${realmText(duel.opp.realm)}`;
     duel.opp['好感度']=clamp(duel.opp['好感度']-30);
-    if(!(hideActive(S.player)&&activeHide(S.player).tier>=2)) S.player['凶名']=clamp(S.player['凶名']+5);   // 敛气诀（玄阶以上）：此战不涨凶名
+    S.player['凶名']=clamp(S.player['凶名']+5);
     addVendetta(him,`被你毁了道基，此仇不共戴天`,true,60);
     finish(`主角获胜，重创${him}，毁了他的道基（修为跌到${realmText(duel.opp.realm)}，结下死仇）。`);
   };
   $('dKill').onclick=()=>{
     duel.opp.alive=false; S.stats.kills++; ledger(`亲手杀了${duel.opp.name}`);
     const r=(S.world.ranking||[]).find(x=>x.name===duel.opp.name); if(r) r.alive=false;
-    if(!(hideActive(S.player)&&activeHide(S.player).tier>=2)) S.player['凶名']=clamp(S.player['凶名']+(duel.opp.alignment==='邪道'?4:15));   // 敛气诀（玄阶以上）：此战不涨凶名
+    S.player['凶名']=clamp(S.player['凶名']+(duel.opp.alignment==='邪道'?4:15));
     // 死者的同门亲友会来寻仇
     const kin=kinOf(duel.opp).slice(0,2);
     for(const k of kin) addVendetta(k.name,`你杀了${him}，他要为其讨还血债`,true,45);
@@ -8577,13 +8626,17 @@ function duelDeath(txt){
   duel.resultText=txt; duel.dead=true; snapshotDuel(); saveGame();
   showDuelDeath();
 }
-function finalizeDuelHp(){ S.player.hp=clamp(duel.pHp,0,hpMaxOf(S.player)); S.player.status=S.player.status.filter(t=>t!=='重伤'); if(S.player.hp<30&&S.player.hp>0) S.player.status.unshift('重伤'); }
+function finalizeDuelHp(){ S.player.hp=clamp(duel.pHp,0,hpMaxOf(S.player));
+  if(S.descent&&curPlane()==='下界'&&!duel.friendly&&!duel.xianTax&&S.player.hp>0){ duel.xianTax=1; S.player.hp=Math.max(1,S.player.hp-10); ledger('在下界全力出手，被界力反噬，气血 −10'); if(S.player.hp<30) S.descent.forced=true; } S.player.status=S.player.status.filter(t=>t!=='重伤'); if(S.player.hp<30&&S.player.hp>0) S.player.status.unshift('重伤'); }
 async function afterDuel(){
   finalizeDuelHp();
   if(S.player.hp<=0) S.player.hp=1;
   renderPanel(); checkAchievements();
   const judge=duel.judge||{fate:d20(),check:null,worldEvent:null};
   judge.duel=true;
+  { const orr=typeof npcRealmOf==='function'?npcRealmOf(duel.opp):null; if(orr) judge.oppMajor=orr.major; }   // 10-09：战利品越级按对手修为
+  if(judge.relicTry) judge.relicWin=duel.result==='win'||duel.result==='oppYield';
+  if(judge.foeFight) judge.foeWin=duel.result==='win'||duel.result==='oppYield';
   judge.months=1/30;   // 一场斗法连收拾带养息算一天，别再挪一个月
   const dl=duel;
   duel=null; S.duelState=null; saveGame();
@@ -8666,7 +8719,7 @@ function warHarsh(mine){ return mine?Math.max(0.12,fdm().injury):Math.max(0.5,fd
 function adQuick(a,b){
   // 阵前临场发挥：各自武功上下浮动，保留旧制一半的骰子起伏，阵战才有以弱胜强
   const mk=(side,x)=>{
-    const k=adSkillsFrom(npcKit(x)), W=Math.max(1,num(x['武功'])+Math.round(rollMod(d20())*AD.warSwing));
+    const k=adSkillsFrom(npcKitLive(x),x), W=Math.max(1,num(x['武功'])+Math.round(rollMod(d20())*AD.warSwing));
     return adUnit(side,{name:x.name,hp:clamp(100-num(x.hurt)*0.6,30,100),qi:clamp(50+W/adScale()/2),W,best:k.best,skills:k.skills,weapon:''});
   };
   // 引擎里只有对手那一边会认输逃跑，谁站哪边掷硬币定，免得哪一方白占便宜
@@ -8739,7 +8792,7 @@ function warRound(label, minePicked, foePicked){
     if(!b){ mw++; warSys(`${esc(a.name)}无人可敌，这一场算本派的。`,'good'); continue; }
     const r=clash(a,b);
     const win=r.aWin;
-    const loser=r.loser, txt=r.dead?'当场毙命':r.end==='oppYield'?'拱手认输':r.end==='draw'?'力竭罢手':(num(loser.hurt)>=60?'重伤倒地':'负伤退下');
+    const loser=r.loser, txt=r.dead?'当场毙命':r.end==='oppYield'?'收手认输':r.end==='draw'?'灵力耗尽罢手':(num(loser.hurt)>=60?'重伤倒地':'负伤退下');
     const how=`斗了${r.rounds<=10?'零一二三四五六七八九十'[r.rounds]:r.rounds<20?'十'+('零一二三四五六七八九'[r.rounds-10]||'').replace('零',''):r.rounds}回合${r.top?`，${esc(r.winner.name)}凭一路「${esc(r.top)}」`:''}`;
     if(win){ mw++; warSys(`${esc(a.name)}(${a['武功']}) 胜 ${esc(b.name)}(${b['武功']})，${how}，${esc(b.name)}${txt}。`,'good'); }
     else   { tw++; warSys(`${esc(a.name)}(${a['武功']}) 败于 ${esc(b.name)}(${b['武功']})，${how}，${esc(a.name)}${txt}。`,'bad'); }
@@ -8874,9 +8927,11 @@ function warAftermathPrompt(action, judge, wd){
 
 【推演要求（宗门战实录、眼下的状态与判定都写在后面）】
 ${WORLD_STATE_RULES}
+${DUEL_WRITE}
+
 请把这一仗写成一段宗门大战（400-650字）：
 - 按实录的顺序写，先锋、中军、主将三阵都要写到，阵亡和负伤的人要点名字，不许改写胜负、不许让死人活过来、不许让活人死。
-- 主将那一场按斗法实录的回合铺陈（实录里「你」指主角），实录里「」中的招式名照原样用上；先锋、中军各场实录里写了凭哪一路招式取胜的，也要写到。
+- 主将那一场以斗法实录为骨架（实录里「你」指主角），挑转折写，实录里「」中的招式名照原样用上；先锋、中军各场实录里写了凭哪一路招式取胜的，也要写到。
 - 再写这一仗之后的修真界：两派门人的反应、旁观者怎么说、${w.foe}那边接下来会怎么样。
 - 宗门的数字（势力、威望、公帐、弟子）全部由引擎记账，你只管叙述，不要在任何字段里改动它们；factionUpdates 只在本派与${w.foe}之外的第三方宗门要表态时才用。
 - 数值变化如实写入playerChanges（气血hp已由引擎结算，不要再写hp）与npcUpdates。
@@ -8885,7 +8940,7 @@ ${WORLD_STATE_RULES}
 
 ${JSON_RULE}
 输出格式同常规回合：
-{"narrative":"","summary":"","scene":{"location":"","unresolved":[]},"check":null,
+{"narrative":"","summary":"","scene":{"location":"","present":["本回结束时在场人物的准确姓名（死了、跑了的不算）"],"unresolved":[]},"check":null,
 "playerChanges":{"attributes":{},"fame":{"声望":0,"凶名":0},"money":0,"skills":{},"artsAdd":[],"artsTrain":[],"statusAdd":[],"statusRemove":[],"itemsAdd":{},"itemsRemove":[]},
 "npcUpdates":[],"newNpcs":[],"npcEvents":[],"rumors":[],"newVendettas":[],"questUpdates":[],"newQuests":[],"rankingUpdates":[],"rankingAdd":[],"factionUpdates":[],"duel":null,"options":[],"gameOver":false,"ending":null}
 
@@ -9273,7 +9328,7 @@ function convoAttempt(npc,line){
 function convoAttemptText(att){
   if(fdm().freeAct) return '【引擎判定】本局言出法随，不做说服判定：主角说什么就办成什么，attempt 填 null。';
   if(!att||typeof att!=='object') return '【引擎判定】这句话引擎不作成败判定（attempt 填 null），按人物的身份、性格与好感如常回应；要不要答应、给不给东西，照好感与家底拿捏。';
-  return `【引擎判定】主角这句话是一次「${att.type}」，难度${att.need}，引擎判定【${att.success?'成功':'失败'}】。${att.success?'照成功写：对方被说动、松口、上当或吐露，谈成的写进 effects。':'照失败写：对方不答应、不上当、不吐口，effects 留空（引擎也不会给），reply 里写清为什么不肯。'}attempt 原样填 {"type":"${att.type}","success":${att.success}}，别的数字不用写。`;
+  return `【引擎判定】主角这句话是一次「${att.type}」，难度${att.need}，引擎判定【${att.success?'成功':'失败'}】。${att.success?'照成功写：对方被说动、松口、上当或吐露，谈成的写进 effects。能兑现多少以【此人眼下能为主角做到什么】为限：那里写着不会给的，嘴上也不许答应，改成别的让步（透个消息、指条路、记个人情）。':'照失败写：对方不答应、不上当、不吐口，effects 留空（引擎也不会给），reply 里写清为什么不肯。'}attempt 原样填 {"type":"${att.type}","success":${att.success}}，别的数字不用写。`;
 }
 function validateConvo(d,npc,roll,opt){
   const lenient=!!(opt&&opt.lenient);
@@ -9912,7 +9967,7 @@ function materializeHidden(h){
 const FOE_BEASTS=['裂地犀','噬魂蝠王','九头蝰','赤焰蛛后','碧眼妖狼','玄甲蝎','雷翼鹰','鬼面猿','冰魄蛟','血纹豹'];
 function foeRealm(R){ const p=S.player, pi=realmIndex(p.realm); if(R.key==='large'&&Math.random()<0.15&&p.realm.major<7) return {major:p.realm.major+1,minor:1,perfect:false,ascended:false}; const off=pick([-1,0,0,0,1,1,1,2,2]); const r=parseRealm(realmFromIdx(Math.max(1,Math.min(30,pi+off)))); return r||Object.assign({},p.realm); }
 function makeFoe(R,kind){
-  const p=S.player, rr=foeRealm(R), lethal=S.freedom!=='free'&&Math.random()<(R.key==='large'?0.6:(R.key==='mid'?0.3:0));
+  const p=S.player, rr=foeRealm(R), lethal=S.freedom!=='free'&&Math.random()<(R.key==='large'||R.key==='xlarge'?0.6:(R.key==='mid'||R.key==='xmid'?0.3:0));
   if(kind==='妖兽'){ const nm=pick(FOE_BEASTS.filter(b=>!(S.npcs||[]).some(n=>n.name===b)))||'守地妖兽'; return {kind,name:nm,realm:rr,realmText:realmText(rr),lethal,temp:1}; }
   if(Math.random()<0.3){
     const pool=[...((S.world&&S.world.ranking)||[]),...((S.world&&S.world.tianjiao)||[]),...(typeof hiddenList==='function'?hiddenList():[])].filter(x=>x&&x.alive!==false&&x.name!==playerName()&&x.realm&&(typeof x.realm==='object'?x.realm:parseRealm(x.realm)));
@@ -10320,7 +10375,7 @@ function renderDebts(){
   });
 }
 function renderGraph(){
-  const alive=S.npcs.slice(0,14);
+  const alive=S.npcs.filter(n=>!n.beast).slice(0,14);
   const W=344,H=Math.max(236,132+alive.length*12);
   const cx=W/2,cy=H/2,rx=W/2-54,ry=H/2-42;
   let edges='',nodes='';
@@ -10337,8 +10392,10 @@ function renderGraph(){
     const w=1+val/40;
     const r=n.alive?(13+Math.round(val/12)):13;   // 交情越深，人越显眼
     edges+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${ec}" stroke-width="${n.alive?w:1}" stroke-dasharray="${n.alive?'none':'4 4'}" opacity=".65" stroke-linecap="round"/>`;
-    const slot=avSlotOf(n), si=AV_SLOTS.indexOf(slot), ring=avRing(n);
-    const face=(si>=0&&AV_SHEET)?(()=>{
+    const slot=avSlotOf(n), si=AV_SLOTS.indexOf(slot), ring=avRing(n), custom=customAvatarOf(n);
+    const face=custom?`<clipPath id="gav${i}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>
+      <image href="${custom}" x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#gav${i})" opacity="${n.alive?1:.5}" style="${n.alive?'':'filter:grayscale(1)'}"/>
+      <circle cx="${x}" cy="${y}" r="${r-1}" fill="none" stroke="${n.alive?ring:'#999'}" stroke-width="2.5"/>`:(si>=0&&AV_SHEET)?(()=>{
       const D=r*2*AV_ZOOM, col=si%AV_COLS, row=Math.floor(si/AV_COLS);
       return `<clipPath id="gav${i}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>
       <image href="${AV_SHEET}" x="${x-(col+0.5)*D}" y="${y-(row+0.5)*D}" width="${AV_COLS*D}" height="${AV_ROWS*D}"
@@ -10353,8 +10410,10 @@ function renderGraph(){
       <text x="${x}" y="${y-24}" text-anchor="middle" font-size="10" fill="#A8862F">${esc(n.relation)}</text>
     </g>`;
   });
-  const mSlot=avSlotOf(S.player), mi=AV_SLOTS.indexOf(mSlot), mr=21;
-  const meFace=(mi>=0&&AV_SHEET)?(()=>{
+  const mSlot=avSlotOf(S.player), mi=AV_SLOTS.indexOf(mSlot), mr=21, mCustom=customAvatarOf(S.player);
+  const meFace=mCustom?`<clipPath id="gavme"><circle cx="${cx}" cy="${cy}" r="${mr}"/></clipPath>
+    <image href="${mCustom}" x="${cx-mr}" y="${cy-mr}" width="${mr*2}" height="${mr*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#gavme)"/>
+    <circle cx="${cx}" cy="${cy}" r="${mr-1}" fill="none" stroke="#3C7D62" stroke-width="3"/>`:(mi>=0&&AV_SHEET)?(()=>{
     const D=mr*2*AV_ZOOM, col=mi%AV_COLS, row=Math.floor(mi/AV_COLS);
     return `<clipPath id="gavme"><circle cx="${cx}" cy="${cy}" r="${mr}"/></clipPath>
     <image href="${AV_SHEET}" x="${cx-(col+0.5)*D}" y="${cy-(row+0.5)*D}" width="${AV_COLS*D}" height="${AV_ROWS*D}" clip-path="url(#gavme)"/>
@@ -10375,8 +10434,46 @@ function renderGraph(){
 /* ================= 换画像 =================
    同性别的脸排前面，特型其次，另一性别折起来。选中即锁定（avatarLocked），
    读档校验和自动分配都不再动它；「随天意」解锁、交回自动分配。 */
+function customAvatarOf(n){
+  const src=n&&n.customAvatar;
+  return typeof src==='string'&&src.length<=350000&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(src)?src:'';
+}
+let avatarPickerSession=null;
+async function readAvatarImage(file){
+  if(!file||!file.size) throw new Error('图片为空，请重新选择');
+  if(file.size>10*1024*1024) throw new Error('图片超过 10 MB，请先缩小后再上传');
+  const supported=/^image\/(?:jpeg|png|webp|gif|avif|bmp|x-ms-bmp)$/i;
+  if(!supported.test(file.type||'')&&!(!file.type&&/\.(?:jpe?g|png|webp|gif|avif|bmp)$/i.test(file.name||'')))
+    throw new Error('请选择 JPG、PNG、WebP 等常见图片');
+  const url=URL.createObjectURL(file), img=new Image();
+  let timer;
+  try{
+    await new Promise((resolve,reject)=>{
+      timer=setTimeout(()=>reject(new Error('图片读取超时，请重新选择')),15000);
+      img.onload=resolve;
+      img.onerror=()=>reject(new Error('图片无法读取，请换一张 JPG 或 PNG 图片'));
+      img.src=url;
+    });
+    const w=img.naturalWidth,h=img.naturalHeight;
+    if(!w||!h||w*h>40000000) throw new Error('图片尺寸过大或无法读取，请先缩小后再上传');
+    const canvas=document.createElement('canvas'); canvas.width=384; canvas.height=384;
+    const ctx=canvas.getContext('2d');
+    if(!ctx) throw new Error('当前浏览器无法处理图片，请换一个浏览器试试');
+    ctx.fillStyle='#EFE5CF'; ctx.fillRect(0,0,384,384);
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+    const side=Math.min(w,h);
+    ctx.drawImage(img,(w-side)/2,(h-side)/2,side,side,0,0,384,384);
+    const src=canvas.toDataURL('image/jpeg',0.88);
+    if(!customAvatarOf({customAvatar:src})) throw new Error('图片处理失败，请换一张图片');
+    return src;
+  }finally{ clearTimeout(timer); img.onload=null; img.onerror=null; URL.revokeObjectURL(url); }
+}
+
 function openAvatarPicker(n,isMe){
   if(!n) return;
+  if(busy){ toast('请等这一回推演结束后再换画像'); return; }
+  const session={owner:S,n,isMe,revision:0}; avatarPickerSession=session;
+  const canApply=()=>avatarPickerSession===session&&S===session.owner&&!busy&&$('avMask').classList.contains('on');
   const g=avG(n.gender), other=g==='f'?'m':'f';
   const cur=avSlotOf(n);
   const same=AV_SLOTS.filter(k=>k[0]===g);
@@ -10385,7 +10482,12 @@ function openAvatarPicker(n,isMe){
   const band=['','少年','青年','中年','老年'];
   const cell=k=>`<div class="cell ${cur===k?'sel':''}" data-a="${k}" title="${esc(avDesc(k))}" style="${avCellStyle(k)||''}"></div>`;
   const grid=list=>`<div class="avpick">${list.map(cell).join('')}</div>`;
-  let body=`<div class="avpick"><div class="cell auto ${n.avatarLocked?'':'sel'}" data-a="">随天意</div></div>`;
+  let body=`<div class="avupload"><div class="avpreview" id="avUploadPreview">${avatarFace(n,'',64,isMe)}</div>
+    <div class="avupload-info"><button class="mbtn primary" id="avUploadBtn">上传自己的图片</button>
+    <input id="avUploadFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" hidden>
+    <small>最大 10 MB，支持 JPG、PNG、WebP 等图片。自动居中裁成方形；动图取静态画面。图片仅保存在本机，随存档导出。</small>
+    <div class="avupload-status" id="avUploadStatus" role="status" aria-live="polite"></div></div></div>
+    <div class="avpick"><div class="cell auto ${n.avatarLocked||customAvatarOf(n)?'':'sel'}" data-a="">随天意</div></div>`;
   for(let b=1;b<=4;b++){
     const l=same.filter(k=>k[1]===String(b));
     if(l.length) body+=`<div class="avsec">${g==='f'?'女':'男'} · ${band[b]}</div>`+grid(l);
@@ -10393,25 +10495,52 @@ function openAvatarPicker(n,isMe){
   body+=`<div class="avsec">特型（僧道丐差、蒙面客）</div>`+grid(xs);
   body+=`<details${cur&&cur[0]===other?' open':''}><summary>另一性别的画像</summary>${grid(diff)}</details>`;
   $('avMTitle').textContent=(n.name||'主角')+' · 换画像';
-  $('avMSub').textContent=`${isMe?'主角 · ':''}${n.gender||''} · ${num(n.age)||'?'}岁${n.identity?' · '+n.identity:''}`;
+  $('avMSub').textContent=`${isMe?'主角 · ':''}${unkOf(n,'G')?'性别未知':(n.gender||'')} · ${unkOf(n,'A')?'?':(num(n.age)||'?')}岁${n.identity?' · '+n.identity:''}`;
   $('avMBody').innerHTML=body;
-  const showNow=()=>{ const s=avSlotOf(n); $('avMNow').textContent=(n.avatarLocked?'已锁定：':'自动分配：')+(avDesc(s)||'—'); };
+  $('avMBody').scrollTop=0;
+  const showNow=()=>{
+    const custom=customAvatarOf(n), s=avSlotOf(n);
+    $('avMNow').textContent=custom?'已使用自定义头像；选下方画像或「随天意」可替换。':(n.avatarLocked?'已锁定：':'自动分配：')+(avDesc(s)||'—');
+    $('avUploadPreview').innerHTML=avatarFace(n,'',64,isMe);
+    $('avUploadBtn').textContent=custom?'重新上传图片':'上传自己的图片';
+  };
+  const refresh=()=>{
+    showNow(); renderPanel();
+    if(!isMe&&$('npcMask').classList.contains('on')) showNpc(n);
+    saveGame();
+  };
   showNow();
   $('avMBody').querySelectorAll('.cell').forEach(el=>el.onclick=()=>{
+    if(!canApply()){ toast('请等这一回推演结束后再换画像'); return; }
+    session.revision++;
     const k=el.dataset.a||null;
     setAvatar(n,k);
     $('avMBody').querySelectorAll('.cell').forEach(x=>x.classList.remove('sel'));
     el.classList.add('sel');
-    showNow();
-    renderPanel();
-    if(!isMe&&$('npcMask').classList.contains('on')) showNpc(n);
-    if(typeof renderGraph==='function'&&$('graphWrap')) try{ renderGraph(); }catch(_){}
-    saveGame();
+    $('avUploadStatus').textContent='';
+    refresh();
   });
+  $('avUploadBtn').onclick=()=>{ if(canApply()) $('avUploadFile').click(); };
+  $('avUploadFile').onchange=async e=>{
+    const file=e.target.files[0]; e.target.value=''; if(!file) return;
+    const revision=++session.revision;
+    const button=$('avUploadBtn'), status=$('avUploadStatus');
+    button.disabled=true; status.textContent='正在处理图片……';
+    try{
+      const src=await readAvatarImage(file);
+      if(!canApply()||session.revision!==revision) return;
+      n.customAvatar=src; n.avatarLocked=true;
+      $('avMBody').querySelectorAll('.cell').forEach(x=>x.classList.remove('sel'));
+      refresh(); status.textContent='头像已更换，已加入当前存档。';
+    }catch(err){
+      if(canApply()&&session.revision===revision) status.textContent=err.message||'图片读取失败，请重新选择';
+    }finally{ button.disabled=false; }
+  };
   $('avMask').classList.add('on');
 }
 // k 为空＝交回自动分配
 function setAvatar(n,k){
+  delete n.customAvatar;
   if(k&&AV_SLOTS.indexOf(k)>=0){ n.avatar=k; n.avatarLocked=true; n.portrait=avDesc(k); }
   else { n.avatarLocked=false; n.avatar=null; n.portrait=''; avSlotOf(n); }
 }
@@ -10654,11 +10783,11 @@ function logChapter(div){
   while(S.chapters.length>(idbOk?14:60)) S.chapters.shift();
 }
 // 新标尺下光看 need 没概念，直接把成算算给玩家
-function optChance(attr,need,kind){
+function optChance(attr,need,kind,exact){
   const p=S.player;
   let val=attrVal(p,attr)+fdm().check+tagCheckMod(p,attr,kind);
   if(S.destitute) val-=Math.round(5*fdm().starve);
-  const dc=Math.max(20,snapNeed(need)+diff().dc);
+  const dc=Math.max(20,(exact?num(need):snapNeed(need))+diff().dc);
   let hit=0;
   for(let r=1;r<=20;r++){ if(r===20||(r!==1&&val+rollMod(r)>=dc)) hit++; }
   return hit*5;
@@ -11369,9 +11498,7 @@ function parseDirectItems(action, skipNames){
   return out;
 }
 function makeJudge(opt,action){
-  const judge={fate:d20(),check:null,worldEvent:pickWorldEvent(action),duel:false,months:optMonths(opt,action),cult:isCultAction(opt,action)?'闭关':'日常',freeInput:!opt};
-  if(!opt){ const da=parseDirectArts(action); if(da&&da.length) judge.directArts=da;
-    const di=parseDirectItems(action, da.map(x=>x.name)); if(di&&di.length){ judge.directItems=di; judge.directAction=action; } }
+  const judge={fate:d20(),check:null,worldEvent:pickWorldEvent(action),duel:false,months:optMonths(opt,action),cult:isCultAction(opt,action)?'闭关':'日常'};
   if(/不再(?:追查|调查|管)|放弃(?:追查|调查)|不追.*了|不查.*了|拒绝.*(?:求助|邀约)/.test(action||'')&&!/不要放弃|不想放弃/.test(action||'')){
     const focus=asArr(S.scene&&S.scene.unresolved);const w=worldState();
     judge.pauseIds=w.threads.filter(e=>e.stage!=='结束'&&(shareRun(e.title,action,3)||focus.some(t=>shareRun(e.title,t,3)))).map(e=>e.id);
@@ -11382,11 +11509,14 @@ function makeJudge(opt,action){
   if(fateDire(judge.fate)&&(S.player.eggFx||{}).direBoon) judge.boon=S.player.eggFx.direBoon;   // 苏铭、李火旺：大凶反成机缘
   else if(fateDire(judge.fate)&&fdm().doom>0) judge.doom=makeDoom();
   if(opt&&opt.debtId) judge.debtId=opt.debtId;
+  if(opt&&opt.reunion) judge.reunion=opt.reunion;
   const kind=(opt&&opt.kind)||actionKind(action);
-  if(opt&&opt.type==='check'&&opt.check&&opt.check.attr&&S.player.attributes[opt.check.attr]!==undefined) judge.check=rollCheck(opt.check.attr,opt.check.need||55,kind,!opt);
+  RC_ACT=String(action||'')+' '+String((opt&&opt.text)||'');
+  if(opt&&opt.type==='check'&&opt.check&&opt.check.attr&&S.player.attributes[opt.check.attr]!==undefined) judge.check=rollCheck(opt.check.attr,opt.check.need||55,kind,!!opt.check.exact);
   // 选项写成「稳妥」、动作却是偷、骗、闯这一类：照样掷骰，一般难度
-  else if(!fdm().freeAct&&RISKY_KINDS.includes(kind)&&!(opt&&['duel','talk','rest'].includes(opt.type))&&!isCultAction(opt,action)) judge.check=rollCheck(kindAttr(kind),55,kind,!opt);
+  else if(!fdm().freeAct&&RISKY_KINDS.includes(kind)&&!(opt&&['duel','talk','rest'].includes(opt.type))&&!isCultAction(opt,action)) judge.check=rollCheck(kindAttr(kind),55,kind);
   if(judge.check) judge.check.engine=true;
+  RC_ACT='';
   realmJudge(judge,action);
   return judge;
 }
@@ -11485,7 +11615,13 @@ async function studyManual(i){
   carryDeltas={};
   let outcome='';
   judge.cult='闭关';
-  if(r.success){
+  if(r.success&&m.recipe){
+    p.recipes=Array.isArray(p.recipes)?p.recipes:[];
+    if(!p.recipes.some(x=>x.name===it.name)) p.recipes.push({name:it.name,kind:m.recipe,product:m.product,grade:m.grade});
+    m.mastered=true;
+    outcome=`参悟${r.crit==='大成功'?'豁然贯通':'有成'}：《${it.name}》记熟了，往后${m.recipe}${m.product?'「'+m.product+'」':''}心里有底（判定 +10）`;
+    ledger(`参透《${it.name}》（${m.recipe}方谱）`);
+  }else if(r.success){
     // 参悟成了就学会这门功法；修为不涨（修为只看灵力与冲关），功法品阶决定日后修炼快慢
     const RR=it.relic&&RELIC[it.relic];
     const art=normArt({name:m.art,desc:`得自《${it.name}》的功法`,style:m.style,level:r.crit==='大成功'?55:(RR&&RR.art&&RR.art.level||28),grade:m.grade,element:m.element});
@@ -11500,6 +11636,9 @@ async function studyManual(i){
       const got=grantLifespan(20,`参悟《${it.name}》豁然贯通，脱胎换骨`);
       if(got){ outcome+=`，寿元+${got}`; carryDeltas['寿元']=got; }
     }
+  }else if(m.recipe){
+    outcome=`没琢磨透《${it.name}》，白费了这些日子`;   // 方谱参不透只是费时，不伤身
+    ledger(`参悟《${it.name}》未成`);
   }else{
     const bad=r.crit==='走火入魔';
     const hf=fdm().studyHurt;
@@ -11513,7 +11652,7 @@ async function studyManual(i){
     ledger(`参悟《${it.name}》未成：${bad?'走火入魔':'灵力紊乱'}，灵力-${lose}`);
     if(it.relic&&RELIC[it.relic]&&RELIC[it.relic].failBreak){ p.items['玉简']=(p.items['玉简']||[]).filter(x=>x!==it); outcome+='；那片骨片在掌心里碎成了粉'; }
   }
-  judge.study={manual:it.name, style:m.style, months:m.months, roll:r, outcome, success:r.success, crit:r.crit};
+  judge.study={manual:it.name, style:m.style, recipe:m.recipe||'', months:m.months, roll:r, outcome, success:r.success, crit:r.crit};
   rebuildStatus();
   renderPanel(); checkAchievements(); saveGame();
   await runTurn(`闭关${m.months}个月，参悟《${it.name}》`, judge, {});
@@ -11525,6 +11664,8 @@ async function act(action, opt){
   if(!action) return;
   $('freeInput').value='';
   setDrawer(false);
+  if(S.descent&&S.descent.forced){ toast('界力催逼，留不住了'); renderOptions([]); return; }
+  if(opt&&opt.descend){ await descendFlow(); return; }
   if(opt&&opt.returnUp){ await returnFlow(); return; }
   if(opt&&opt.jieyin){ jieyinPick(opt.jieyin); return; }
   if(opt&&opt.sendDown){ openSendDown(); return; }
@@ -11550,6 +11691,8 @@ async function act(action, opt){
 
 async function runTurn(action, judge, extra){
   extra=extra||{};
+  if(S&&S.pendingAscend&&!(judge&&(judge.arrive||judge.breakRes||judge.convo))){ toast('接引之光已经落下：先做临行安排，或者直接飞升'); renderOptions([]); return; }
+  if(S&&S.descent&&S.descent.forced&&!(judge&&(judge.returnUp||judge.convo))){ toast('界力催逼，留不住了'); renderOptions([]); return; }
   const owner=S; const request=++turnRequest;
   owner.runId=owner.runId||('r'+Date.now().toString(36)+Math.random().toString(36).slice(2,8));
   const previous=owner.pending&&owner.pending.action===action?owner.pending:null;
@@ -11563,7 +11706,7 @@ async function runTurn(action, judge, extra){
   activeTurnAbort=controller;
   let pending;
   $('choices').innerHTML='';
-  setBusy(true,extra.warData?'两派交兵，正在记下这一仗……':(extra.duelData?'刀光剑影，正在记下这一战……':'笔走龙蛇，正在推演修真界……'));
+  setBusy(true,extra.warData?'两派交兵，正在记下这一仗……':(extra.duelData?'遁光交错，正在记下这一战……':'笔走龙蛇，正在推演修真界……'));
   beginChapter('第 '+cnNum(owner.turn)+' 回',owner.date,action,judge);
   try{
     pending=previous||{id,action,judge,extra:JSON.parse(JSON.stringify(extra))};
@@ -12065,7 +12208,7 @@ $('cfgFont').addEventListener('change',()=>{cfg.fontSize=Number($('cfgFont').val
 function memNote(){
   const M=MEM();
   const rd=(S&&S.stats&&S.stats.redo)||{}, rt=Object.values(rd).reduce((a,b)=>a+num(b),0);
-  return `眼下：前尘卷录 ${M.vol} 卷×${M.volLen} 字，前情提要 ${M.sum} 条，最近剧情原文 ${M.recent} 回，每人往来 ${M.npcMem} 条，事实台账 ${M.ledger} 条${M.convoSum?'；对话时也带上主线提要与台账':'；对话只带最近两回'}。`;
+  return `眼下：前尘卷录 ${M.vol} 卷×${M.volLen} 字，流水账 ${M.sum} 回起（最近 2–4 回附正文），每人往来 ${M.npcMem} 条，事实台账 ${M.ledger} 条${M.convoSum?'；对话时也带上主线提要与台账':'；对话只带最近两回'}。${rt?`本局重写过 ${rt} 次（${Object.entries(rd).map(([k,v])=>k+v).join('，')}）。`:''}`;
 }
 $('cfgMem').addEventListener('change',()=>{
   if(!S) return;
