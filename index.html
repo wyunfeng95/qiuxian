@@ -782,6 +782,11 @@ margin-left:auto
 .card.fz>h3 .fc{
 display:none;font-style:normal;font-size:12px;color:var(--ink-2);letter-spacing:0;margin-left:6px;font-family:var(--font-body)
 }
+.card.fold>h3 .fc{display:inline}
+.card.fold>h3::after{transform:rotate(-45deg) translateY(0)}
+.card.fold{padding-bottom:6px}
+.card.fold>h3{border-bottom:none;margin-bottom:0;padding-bottom:4px}
+.card.fold>*:not(h3){display:none!important}
 .clamp-hide{
 display:none!important
 }
